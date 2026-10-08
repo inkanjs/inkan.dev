@@ -1,0 +1,92 @@
+---
+title: "The context"
+description: "Everything a handler, a hook and a middleware get: ctx."
+---
+
+```ts
+app.post("/teas", { body: NewTea, response: { 201: Tea } }, ({ body, reply }) => {
+  const tea = store.add(body);
+  return reply(201, tea, { location: `/teas/${tea.id}` });
+});
+```
+
+Every handler gets the context of its request. It can be taken apart, `({ params, html })`,
+and every part of it still works: the functions on it need no `this`. Nothing on it is made
+before it is asked for, so what a handler does not use costs nothing.
+
+## The request
+
+| | |
+| --- | --- |
+| `params`, `query`, `headers`, `body` | the input, checked and typed by the route's schemas |
+| `method`, `path`, `url` | the request line; `url` is a `URL`, made only when read |
+| `id` | the request id: the safe one the client sent, or a fresh one |
+| `ip` | the client's address, as the socket or the platform says it |
+| `cookies` | the request's cookies, by name (**0.7.0**) |
+| `signal` | aborted when the client goes away or the route's `timeout` runs out: hand it to the database or to `fetch` (**0.7.0**) |
+| `route` | the route that matched, as it was written |
+| `state` | free space for middleware to hand things on |
+| `req`, `res` | Node's request and response, when it came through a socket |
+
+## The answer
+
+| | |
+| --- | --- |
+| `status(code)` | the status a plain value answers with |
+| `header(name, value)` | a header on the answer |
+| `reply(status, body, headers?)` | another status, typed to the statuses in the contract |
+| `text(body, status?)` | text/plain (**0.7.0**) |
+| `html(markup, status?)` | text/html; write it with the `html` tag (**0.7.0**) |
+| `render(content, props?)` | HTML in the layout of the route's scope (**0.7.0**) |
+| `redirect(to, status?)` | 302, or 301, 303, 307, 308 (**0.7.0**) |
+| `notFound(detail?)` | ends the request with a 404 problem, through `onProblem` (**0.7.0**) |
+| `csv(rows, options?)` | rows as a CSV file, written as they come (**0.7.0**) |
+| `setCookie(name, value, options?)`, `clearCookie(name)` | cookies on the answer, one Set-Cookie each (**0.7.0**) |
+
+To end with any other problem, throw one: `throw problem(409, "taken", "That name is taken")`.
+
+## HTML that is safe by default (0.7.0)
+
+```ts
+import { html, raw } from "@vxnsin/inkan";
+
+app.get("/tea/:name", ({ params }) => html`<h1>${params.name}</h1>`);
+```
+
+The `html` tag escapes every value put into it, so what a user typed cannot become a script
+on the page. Lists are joined, and `null`, `undefined` and `false` write nothing, so a list
+of items or a part shown only to admins goes straight into the template. `raw(markup)` lets
+markup you made yourself through.
+
+```ts
+app.layout((content, { title }) => html`<!doctype html><title>${title}</title><main>${content}</main>`);
+app.get("/", ({ render }) => render(html`<p>Tea, checked.</p>`, { title: "Home" }));
+```
+
+A layout belongs to its scope: a plugin can have its own, and the closest one wins.
+
+## Cookies (0.7.0)
+
+| option of `setCookie` | default |
+| --- | --- |
+| `maxAge` (seconds), `expires` | until the browser closes |
+| `path` | `/` |
+| `domain` | |
+| `secure` | `false`, so it works on plain HTTP; turn it on behind TLS |
+| `httpOnly` | `true`: out of reach of the page's scripts |
+| `sameSite` | `"Lax"`; `"None"` needs `secure: true` |
+| `partitioned` | |
+
+## CSV (0.7.0)
+
+```ts
+app.get("/export", ({ csv, signal }) => csv(rowsFromDb(signal), { filename: "teas.csv", separator: ";", bom: true }));
+```
+
+| option | default |
+| --- | --- |
+| `columns` | the keys of the first row; or a list of keys, or key → heading |
+| `separator` | `,`; `;` for a German Excel |
+| `bom` | `false`; `true` so Excel reads UTF-8 |
+| `filename` | offered for download under this name |
+| `guardFormulas` | `true`: a cell that starts with `=`, `+`, `-` or `@` gets a `'`, so a spreadsheet shows it instead of running it |

@@ -1,0 +1,81 @@
+---
+title: "The app"
+description: "inkan(options): every option, and every method the app has."
+---
+
+```ts
+import { inkan } from "@vxnsin/inkan";
+
+const app = inkan({ title: "Tea Shop", version: "1.0.0" });
+```
+
+`inkan(options)` makes an app. Everything an app does with routes, hooks and plugins, a
+scope from `register` does too; what only the app has is marked as such.
+
+## Options
+
+| option | default | what it does |
+| --- | --- | --- |
+| `title`, `version`, `description`, `servers` | | for the OpenAPI document and the docs page |
+| `docs` | `"/docs"` | where the docs page lives, or `false` |
+| `openapi` | `"/openapi.json"` | where the OpenAPI document lives, or `false` |
+| `inspector` | `"/_inkan"` in development | the request inspector, loopback only, or `false` |
+| `validateResponses` | on in development | checks what handlers return against `response` |
+| `bodyLimit` | `1048576` (1 MiB) | the largest request body in bytes; a route can have its own |
+| `timeout` | none | milliseconds a handler may take before a 504 (**0.7.0**) |
+| `log` | `"pretty"` in development, `"json"` in production | one line per request, or `false` |
+| `logger` | | takes every log entry instead of the console |
+| `requestId` | `"x-request-id"` | the header that carries the request id, or `false` |
+| `gracefulShutdown` | `true` | finishes open requests on SIGINT and SIGTERM |
+| `workers` | one process | `"auto"` or a number: one process per core, one port |
+| `dev` | `NODE_ENV !== "production"` | development mode |
+| `onError` | `console.error` | sees every error that becomes a 500 |
+| `seal` | | the contracts `inkan seal` stamped into code |
+
+## Routes
+
+| method | |
+| --- | --- |
+| `get`, `post`, `put`, `patch`, `delete` `(path, spec?, handler)` | a route; see [Routes](/docs/api/routes) |
+| `use(...middleware)` | middleware for the routes after it; on the app, for every request |
+| `security(scheme)` | the credentials the routes after it ask for |
+| `mount(prefix, routes)` | a group made with `routes()`, under a prefix, types and all |
+| `load(folder)` | a route for every file in a folder |
+
+## Hooks and plugins
+
+| method | runs |
+| --- | --- |
+| `onRequest(fn)` | once a route is found, before the body is read; return a value to answer at once |
+| `preHandler(fn)` | after the input is checked, before the handler |
+| `onSend(fn)` | on every answer before it is written; may change it |
+| `onResponse(fn)` | after the answer is written: metrics, audit logs |
+| `onProblem(fn)` | on every problem before it becomes an answer |
+| `register(plugin, options?)` | a plugin, in a scope of its own, or in the same one for `plugin(fn, { shared: true })` |
+| `decorate(name, value)` | a value on every context of the scope: `ctx.db` |
+| `layout(fn)` | how the pages of the scope look around `ctx.render(...)` (**0.7.0**) |
+
+Hooks, decorations and layouts reach the routes of their scope and the scopes inside it,
+and nothing outside.
+
+## Running it (the app only)
+
+| method | |
+| --- | --- |
+| `listen(port?, host?)` | starts the server; the port comes from the argument, then `$PORT`, then 3000 |
+| `listener` | a plain `(req, res)` function, for your own `http.createServer` |
+| `fetch(request, { remote? })` | Request in, Response out: Bun, Deno, serverless |
+| `exchange(request)` | plain values in and out, for an adapter to another server |
+| `bodyFor(method, url)` | for adapters: the body limit, and whether the body goes unread |
+| `onListen(fn)`, `onClose(fn)` | open and close what the app needs around running |
+| `ready()` | resolves once every plugin has loaded |
+
+## Testing and tooling (the app only)
+
+| method | |
+| --- | --- |
+| `inject({ method, url, headers, body })` | a request straight into the app, no port; answers `{ status, headers, cookies, text, body }` |
+| `check(options?)` | runs every route's examples as tests |
+| `openapi()` | the OpenAPI 3.1 document |
+| `routes()` | every route, as inkan sees it |
+| `sealed()` | how the seal went: how many contracts run on it, and which changed |

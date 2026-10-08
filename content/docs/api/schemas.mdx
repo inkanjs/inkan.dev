@@ -1,0 +1,69 @@
+---
+title: "Schemas"
+description: "t: every schema, and every rule a schema takes."
+---
+
+```ts
+import { t } from "@vxnsin/inkan";
+
+const Tea = t.object({
+  id: t.int(),
+  name: t.string().min(1).max(60),
+  kind: t.enum(["green", "black", "oolong"]),
+  tags: t.array(t.string()).optional(),
+});
+```
+
+One schema is the check, the TypeScript type and the JSON Schema, so they cannot drift
+apart. `Infer<typeof Tea>` is the type.
+
+## Kinds
+
+| | |
+| --- | --- |
+| `t.string()` | text |
+| `t.number()`, `t.int()` | a number, a whole number |
+| `t.boolean()` | true or false; from text, `true`/`1`/empty and `false`/`0` |
+| `t.date()` | an ISO date-time or a `Date`, as a `Date` |
+| `t.enum([...])`, `t.literal(value)` | one of these values, or this one |
+| `t.object({ ... })` | an object; keys it does not list are dropped |
+| `t.array(item)` | a list; from a query, `?tag=a` reads as `["a"]` |
+| `t.record(value)` | an object with any keys and values of one kind |
+| `t.union(a, b, ...)` | any one of these |
+| `t.discriminated(key, { tag: object, ... })` | one of these objects, picked by the tag in `key` |
+| `t.lazy(() => schema)` | for a shape that contains itself; name it with `.named()` |
+| `t.any()` | anything |
+| `t.empty()` | no body, for a 204 |
+| `t.file()` | a file in a multipart body |
+| `t.binary()` | the whole body as bytes |
+| `t.stream()` | the body as a stream, read by the handler |
+| `t.events({ name: schema })` | the events of a server-sent event stream |
+| `t.problem()` | an RFC 9457 problem document |
+
+## Rules
+
+| on | rule | |
+| --- | --- | --- |
+| every schema | `.optional()`, `.nullable()`, `.default(value)` | may be missing, may be null, or this when missing |
+| | `.describe(text)`, `.example(...values)`, `.deprecated()` | for the docs |
+| | `.named(name)` | listed once in OpenAPI and referred to |
+| | `.refine(fn, message)` | a rule of your own |
+| | `.transform(fn)` | another value after the check |
+| string | `.min(n)`, `.max(n)`, `.pattern(re)`, `.trim()` | length, a pattern, trimmed first |
+| | `.email()`, `.uuid()`, `.format("date-time" \| "date" \| "uri")` | a known format |
+| number, int | `.min(n)`, `.max(n)`, `.positive()` | |
+| array | `.min(n)`, `.max(n)` | items |
+| object | `.strict()` | keys it does not list are an error |
+| | `.passthrough()` | keys it does not list are kept |
+| | `.extend({...})`, `.pick(...keys)`, `.omit(...keys)`, `.partial()` | a new shape from this one |
+| file, binary, stream | `.max(bytes)`, `.accept(...types)` | size and media types; `"image/*"` takes a family |
+
+## Outside a route
+
+| | |
+| --- | --- |
+| `schema.parse(value, { coerce? })` | the value, or a `ValidationError` |
+| `schema.safeParse(value, { coerce? })` | `{ ok: true, value }` or `{ ok: false, issues }` |
+| `schema.toJSONSchema()` | the JSON Schema |
+
+`coerce` turns text into what the schema asks for, as for params, query and headers.
