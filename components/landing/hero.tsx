@@ -119,7 +119,7 @@ export function Hero() {
             onAnimationComplete={() => setLanded(true)}
             className="drop-shadow-[0_10px_24px_rgba(196,56,31,.35)]"
           >
-            <Seal className="h-24 w-24" ink={false} />
+            <Seal className="h-24 w-24" />
           </motion.div>
         </div>
 
