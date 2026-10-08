@@ -19,7 +19,8 @@ jobs:
           node-version: 24
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
-      - run: npx tsc --noEmit
+      # PageProps and LayoutProps are written by Next itself; typegen does that without a build
+      - run: npx next typegen && npx tsc --noEmit
       # the playground API runs its own examples, as every inkan app can
       - run: npm run check
       - run: npm run build
