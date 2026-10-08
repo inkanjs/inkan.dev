@@ -53,7 +53,7 @@ report points at the right line.
 The client's address, as the socket or the platform says it. Behind a proxy that is the
 proxy; read its `x-forwarded-for` yourself when you trust it.
 
-## cookies <small>0.7.0</small>
+## cookies <small>0.6.0</small>
 
 ```ts
 ({ cookies }) => sessions.get(cookies.sid)
@@ -61,7 +61,7 @@ proxy; read its `x-forwarded-for` yourself when you trust it.
 
 The request's cookies, by name, decoded. Read on first use.
 
-## signal <small>0.7.0</small>
+## signal <small>0.6.0</small>
 
 ```ts
 app.get("/report", { timeout: 600_000 }, ({ signal }) => db.query(REPORT, { signal }));
@@ -130,7 +130,7 @@ app.post("/teas", { body: NewTea, response: { 201: Tea } }, ({ body, reply }) =>
 Another status, with extra headers if needed. It is typed to the statuses the contract
 lists, so `reply(418, …)` on a route that never promised a teapot does not compile.
 
-## text() <small>0.7.0</small>
+## text() <small>0.6.0</small>
 
 ```ts
 ({ text }) => text("pong")
@@ -139,7 +139,7 @@ lists, so `reply(418, …)` on a route that never promised a teapot does not com
 Plain text. The status is the one `status()` set, or the usual one, unless given:
 `text("gone", 410)`.
 
-## html() <small>0.7.0</small>
+## html() <small>0.6.0</small>
 
 ```ts
 import { html } from "@vxnsin/inkan";
@@ -158,7 +158,7 @@ html`<ul>${teas.map((t) => html`<li>${t.name}</li>`)}</ul>${admin && html`<a hre
 `raw(markup)` lets markup you made yourself through unescaped. Never use it for anything a
 user sent.
 
-## render() <small>0.7.0</small>
+## render() <small>0.6.0</small>
 
 ```ts
 app.layout((content, { title }) => html`<!doctype html><title>${title}</title><main>${content}</main>`);
@@ -169,7 +169,7 @@ HTML in the layout of the route's scope, with the props handed to the layout. A 
 have a layout of its own; the closest one wins. Without a layout, the content goes out as it
 is.
 
-## redirect() <small>0.7.0</small>
+## redirect() <small>0.6.0</small>
 
 ```ts
 ({ redirect }) => redirect("/new")          // 302
@@ -179,7 +179,7 @@ is.
 Sends the client elsewhere. A location with characters a header cannot carry is
 percent-encoded first.
 
-## notFound() <small>0.7.0</small>
+## notFound() <small>0.6.0</small>
 
 ```ts
 ({ params, notFound }) => findTea(params.id) ?? notFound(`No tea ${params.id}`)
@@ -189,7 +189,7 @@ Ends the request with a 404 problem, the same one an unknown route gets, through
 `onProblem` like any other. To end with another problem, throw one:
 `throw problem(409, "taken", "That name is taken")`.
 
-## setCookie(), clearCookie() <small>0.7.0</small>
+## setCookie(), clearCookie() <small>0.6.0</small>
 
 ```ts
 ({ setCookie }) => {
@@ -211,7 +211,7 @@ A cookie on the answer; every cookie goes out as a Set-Cookie of its own.
 | `sameSite` | `"Lax"` | `"Strict"`, `"Lax"` or `"None"`, which needs `secure` |
 | `partitioned` | | |
 
-## csv() <small>0.7.0</small>
+## csv() <small>0.6.0</small>
 
 ```ts
 app.get("/export", ({ csv, signal }) =>

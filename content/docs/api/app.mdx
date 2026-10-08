@@ -101,7 +101,7 @@ app.get("/teas", ({ db }) => db.teas.all()); // typed
 Puts a value on every context of the scope, once, on the context's prototype: it costs
 nothing per request. A name the context already has is refused.
 
-## layout() <small>0.7.0</small>
+## layout() <small>0.6.0</small>
 
 ```ts
 app.layout((content, { title }) => html`<!doctype html><title>${title}</title><main>${content}</main>`);
@@ -213,7 +213,7 @@ Runs every route's examples against the app, as `inkan check` does from the comm
 | `inspector` | `"/_inkan"` in development | the request inspector, loopback only, or `false` |
 | `validateResponses` | on in development | checks what handlers return against `response` |
 | `bodyLimit` | 1 MiB | the largest request body in bytes; a route can have its own |
-| `timeout` <small>0.7.0</small> | none | milliseconds a handler may take before a 504 |
+| `timeout` <small>0.6.0</small> | none | milliseconds a handler may take before a 504 |
 | `log` | `"pretty"` in development, `"json"` in production | one line per request, or `false` |
 | `logger` | | takes every log entry instead of the console |
 | `requestId` | `"x-request-id"` | the header for the request id, or `false` |
