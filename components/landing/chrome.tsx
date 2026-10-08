@@ -91,7 +91,13 @@ export function Footer() {
           </div>
         ))}
       </div>
-      <p className="pb-10 text-center font-mono text-xs text-muted">MIT · made by Vensin · this site runs on inkan</p>
+      <p className="pb-10 text-center font-mono text-xs text-muted">
+        MIT · made by{" "}
+        <a href="https://vensin.dev/" className="text-soft underline-offset-4 transition hover:text-hot hover:underline">
+          Vensin
+        </a>{" "}
+        · this site runs on inkan
+      </p>
     </footer>
   );
 }
