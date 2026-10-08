@@ -47,37 +47,39 @@ export function Contract() {
           <Code title="src/app.ts" code={ROUTE} />
         </motion.div>
 
-        {/* the lines from the code to each card, drawn on arrival (wide screens only) */}
-        <svg className="pointer-events-none absolute inset-0 hidden h-full w-full lg:block" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
-          {OUT.map((_, i) => {
-            const y = 8 + i * 16.8;
-            return (
-              <motion.path
-                key={i}
-                d={`M 51.5 50 C 54 50, 53 ${y}, 55.5 ${y}`}
-                fill="none"
-                stroke="var(--seal)"
-                strokeWidth="1.5"
-                strokeDasharray="4 4"
-                vectorEffect="non-scaling-stroke"
-                initial={{ pathLength: 0, opacity: 0 }}
-                animate={on ? { pathLength: 1, opacity: 0.8 } : {}}
-                transition={{ delay: 0.35 + i * 0.09, duration: 0.6 }}
-              />
-            );
-          })}
-        </svg>
-
-        <ul className="grid gap-3">
+        <ul className="relative grid gap-3 lg:pl-10">
+          {/* the line from the code to the spine, and the spine down the cards (wide screens only) */}
+          <motion.span
+            aria-hidden
+            className="absolute -left-10 top-1/2 hidden h-0.5 w-14 origin-left bg-seal/70 lg:block"
+            initial={still ? false : { scaleX: 0 }}
+            animate={on ? { scaleX: 1 } : {}}
+            transition={{ delay: 0.35, duration: 0.35 }}
+          />
+          <motion.span
+            aria-hidden
+            className="absolute left-4 top-[calc(100%/12)] hidden h-[calc(100%*10/12)] w-0.5 origin-center bg-seal/70 lg:block"
+            initial={still ? false : { scaleY: 0 }}
+            animate={on ? { scaleY: 1 } : {}}
+            transition={{ delay: 0.55, duration: 0.45 }}
+          />
           {OUT.map((o, i) => (
             <motion.li
               key={o.title}
               initial={still ? false : { opacity: 0, x: -30, scale: 0.96 }}
               animate={on ? { opacity: 1, x: 0, scale: 1 } : {}}
               transition={{ delay: 0.5 + i * 0.09, type: "spring", stiffness: 200, damping: 22 }}
-              whileHover={{ x: 6 }}
-              className="flex items-center gap-4 rounded-xl border border-line bg-card/80 px-4 py-3 backdrop-blur"
+              whileHover={{ x: 6, transition: { type: "spring", stiffness: 500, damping: 30 } }}
+              className="relative flex items-center gap-4 rounded-xl border border-line bg-card/80 px-4 py-3 backdrop-blur"
             >
+              {/* the tick from the spine to this card */}
+              <motion.span
+                aria-hidden
+                className="absolute -left-6 top-1/2 hidden h-0.5 w-6 origin-left bg-seal/70 lg:block"
+                initial={still ? false : { scaleX: 0 }}
+                animate={on ? { scaleX: 1 } : {}}
+                transition={{ delay: 0.75 + i * 0.07, duration: 0.25 }}
+              />
               <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-seal/10 font-mono text-sm font-bold text-hot">{o.glyph}</span>
               <span>
                 <span className="block font-mono text-sm font-bold">{o.title}</span>

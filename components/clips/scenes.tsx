@@ -4,6 +4,7 @@ import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } fr
 
 const C = { bg: "#221d1a", panel: "#2a2421", bar: "#312a26", ink: "#ece1cf", soft: "#cbbda8", muted: "#8a7d72", seal: "#c4381f", hot: "#e2583e", ok: "#79c08a", gold: "#e3b341" };
 const mono = "var(--font-mono-face), ui-monospace, monospace";
+const noLigatures = { fontVariantLigatures: "none" } as const;
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
@@ -32,7 +33,7 @@ export function SealScene() {
   const stamp = spring({ frame: f - 92, fps, config: { damping: 11, stiffness: 140 } });
   const hash = Math.min(8, Math.max(0, Math.floor((f - 120) / 3)));
   return (
-    <AbsoluteFill style={{ background: C.bg }}>
+    <AbsoluteFill style={{ background: C.bg, ...noLigatures }}>
       <Panel x={50} y={60} w={540} h={320} title="src/app.ts">
         {schema.map((l, i) => (
           <div key={i} style={{ opacity: interpolate(f, [i * 5, i * 5 + 10], [0, 1], clamp) }}>{l}</div>
@@ -49,7 +50,7 @@ export function SealScene() {
       {/* the stamp: lands on the sealed code */}
       <div
         style={{
-          position: "absolute", left: 1010, top: 250, padding: "10px 20px", borderRadius: 10, border: `4px solid ${C.seal}`, color: C.hot,
+          position: "absolute", left: 1040, top: 318, padding: "8px 18px", borderRadius: 10, border: `4px solid ${C.seal}`, color: C.hot,
           fontFamily: mono, fontWeight: 800, fontSize: 26, transform: `rotate(-8deg) scale(${interpolate(stamp, [0, 1], [2.4, 1])})`, opacity: Math.min(1, stamp * 1.5),
           background: "rgba(26,22,20,.85)",
         }}
@@ -76,22 +77,24 @@ export function HooksScene() {
   const good = f % 180;
   const bad = (f + 90) % 180;
   // the good request walks every step; the bad one stops at the contract and turns back as a 400
-  const goodX = interpolate(good, [0, 150], [x0 - 40, x0 + gap * 5 + 60], clamp);
-  const badX = bad < 55 ? interpolate(bad, [0, 55], [x0 - 40, x0 + gap + 40], clamp) : interpolate(bad, [55, 110], [x0 + gap + 40, x0 - 40], clamp);
+  const first = x0 + 75; // the middle of the first box
+  const goodX = interpolate(good, [0, 150], [first - 90, first + gap * 5 + 90], clamp);
+  const badX = bad < 55 ? interpolate(bad, [0, 55], [first - 90, first + gap], clamp) : interpolate(bad, [55, 110], [first + gap, first - 90], clamp);
   return (
-    <AbsoluteFill style={{ background: C.bg, fontFamily: mono }}>
+    <AbsoluteFill style={{ background: C.bg, fontFamily: mono, ...noLigatures }}>
       {steps.map((s, i) => {
-        const lit = Math.abs(goodX - (x0 + i * gap + 70)) < 60;
+        const lit = Math.abs(goodX - (first + i * gap)) < 75;
+        const stopped = bad >= 45 && bad < 75 && i === 1; // the contract, where the bad one bounces
         return (
           <div key={s} style={{ position: "absolute", left: x0 + i * gap, top: 180, width: 150, height: 90, borderRadius: 16, display: "grid", placeItems: "center", fontSize: 19, fontWeight: 700,
-            color: lit ? "#fbf1e6" : C.soft, background: lit ? C.seal : C.panel, boxShadow: lit ? "0 0 0 6px rgba(196,56,31,.25)" : "0 10px 30px rgba(0,0,0,.3)", transition: "none" }}>
+            color: lit || stopped ? "#fbf1e6" : C.soft, background: lit ? C.seal : stopped ? "#8a5a1a" : C.panel, boxShadow: lit ? "0 0 0 6px rgba(196,56,31,.25)" : stopped ? "0 0 0 6px rgba(227,179,65,.25)" : "0 10px 30px rgba(0,0,0,.3)" }}>
             {s}
           </div>
         );
       })}
       <div style={{ position: "absolute", left: x0, top: 224, width: gap * 5 + 150, height: 2, background: C.bar, zIndex: -1 }} />
-      <div style={{ position: "absolute", left: goodX, top: 120, padding: "6px 14px", borderRadius: 999, background: C.ok, color: "#15110f", fontSize: 17, fontWeight: 800 }}>GET /teas/1</div>
-      <div style={{ position: "absolute", left: badX, top: 310, padding: "6px 14px", borderRadius: 999, background: bad < 55 ? C.gold : C.hot, color: "#15110f", fontSize: 17, fontWeight: 800 }}>
+      <div style={{ position: "absolute", left: goodX, top: 120, transform: "translateX(-50%)", whiteSpace: "nowrap", padding: "6px 14px", borderRadius: 999, background: C.ok, color: "#15110f", fontSize: 17, fontWeight: 800 }}>GET /teas/1</div>
+      <div style={{ position: "absolute", left: badX, top: 310, transform: "translateX(-50%)", whiteSpace: "nowrap", padding: "6px 14px", borderRadius: 999, background: bad < 55 ? C.gold : C.hot, color: "#15110f", fontSize: 17, fontWeight: 800 }}>
         {bad < 55 ? "GET /teas/abc" : "400 · id: expected an integer"}
       </div>
       <div style={{ position: "absolute", left: x0, top: 420, fontSize: 21, color: C.muted }}>
@@ -108,7 +111,7 @@ export function StreamScene() {
   const temps = [60, 65, 70, 75, 80];
   const each = 24;
   return (
-    <AbsoluteFill style={{ background: C.bg, fontFamily: mono }}>
+    <AbsoluteFill style={{ background: C.bg, fontFamily: mono, ...noLigatures }}>
       <Panel x={50} y={60} w={600} h={380} title="server: GET /kettle">
         <div style={{ color: C.soft }}>{"sse(async function* (signal) {"}</div>
         <div style={{ color: C.soft }}>{"  for (let c = 60; c <= 80; c += 5)"}</div>

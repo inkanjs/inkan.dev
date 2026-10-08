@@ -8,7 +8,7 @@ import { HooksScene, SealScene, StreamScene } from "@/components/clips/scenes";
 import { useInBrowser } from "@/lib/client-only";
 
 const CLIPS = [
-  { key: "seal", label: "inkan seal", title: "Contracts as plain code", text: "inkan seal compiles your schemas to a file you can read. A hash ties it to the live contract, so a change falls back instead of lying.", component: SealScene, frames: 200 },
+  { key: "seal", once: true, label: "inkan seal", title: "Contracts as plain code", text: "inkan seal compiles your schemas to a file you can read. A hash ties it to the live contract, so a change falls back instead of lying.", component: SealScene, frames: 200 },
   { key: "hooks", label: "hooks", title: "Every request, the same way", text: "onRequest, the contract, preHandler, the handler, onSend, onResponse. A request that breaks the contract never reaches you.", component: HooksScene, frames: 180 },
   { key: "streams", label: "streams", title: "Streams with a contract too", text: "Server-sent events are checked event by event, kept alive while quiet, and stopped when the client leaves.", component: StreamScene, frames: 170 },
 ];
@@ -16,7 +16,10 @@ const CLIPS = [
 export function Clips() {
   const [active, setActive] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
-  const player = useRef<PlayerRef>(null);
+  // a state, not a ref: the effect below has to run again once the Player is there
+  const [player, setPlayer] = useState<PlayerRef | null>(null);
+  // whether the clip on screen has played to its end; a new tab starts it over
+  const [ended, setEnded] = useState(false);
   const seen = useInView(ref, { margin: "-15% 0px" });
   const still = useReducedMotion();
   const clip = CLIPS[active];
@@ -24,10 +27,18 @@ export function Clips() {
   const mounted = useInBrowser();
 
   useEffect(() => {
-    if (!player.current) return;
-    if (seen && !still) player.current.play();
-    else player.current.pause();
-  }, [seen, still, active, mounted]);
+    if (!player) return;
+    const onEnded = () => setEnded(true);
+    player.addEventListener("ended", onEnded);
+    return () => player.removeEventListener("ended", onEnded);
+  }, [player]);
+
+  useEffect(() => {
+    if (!player) return;
+    // a clip that has played to its end stays there; only switching back to it plays it again
+    if (seen && !still && !ended) player.play();
+    else player.pause();
+  }, [player, seen, still, ended]);
 
   return (
     <section id="clips" className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8">
@@ -41,7 +52,10 @@ export function Clips() {
             role="tab"
             aria-selected={i === active}
             type="button"
-            onClick={() => setActive(i)}
+            onClick={() => {
+              setActive(i);
+              setEnded(false); // switching tabs plays the clip from its start
+            }}
             className={`relative rounded-full px-4 py-2 font-mono text-sm transition ${i === active ? "text-[#fbf1e6]" : "text-soft hover:text-ink"}`}
           >
             {i === active && <motion.span layoutId="clip-tab" className="absolute inset-0 rounded-full bg-seal" transition={{ type: "spring", stiffness: 380, damping: 30 }} />}
@@ -61,14 +75,13 @@ export function Clips() {
           ) : (
           <Player
             key={clip.key}
-            ref={player}
+            ref={setPlayer}
             component={clip.component}
             durationInFrames={clip.frames}
             fps={30}
             compositionWidth={1300}
             compositionHeight={540}
-            loop
-            autoPlay={!still}
+            loop={!("once" in clip && clip.once)}
             initiallyMuted
             controls={false}
             clickToPlay={false}
