@@ -41,6 +41,17 @@ Kept running by systemd, pm2 or a container like any Node server, or under
 Build on the machine it runs on (a Raspberry Pi builds it fine, only slower): the standalone
 folder carries the `node_modules` it needs, for the platform it was built on.
 
+
+## On Vercel
+
+Import the repository on [vercel.com](https://vercel.com/new): it finds Next.js and builds it as
+it is, with no settings to change. The standalone folder is made only off Vercel, which serves
+the build itself. Set `GITHUB_TOKEN` (a fine-grained token with read access to public repositories
+is enough) so the community page is not held to GitHub's 60 asks an hour per address.
+
+The playground API keeps its teas in memory, and on Vercel every function instance has its own:
+a new instance starts from the shelf as it ships. That is all the playground needs.
+
 ## Layout
 
 ```

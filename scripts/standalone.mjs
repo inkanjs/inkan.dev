@@ -4,6 +4,7 @@
 import { cpSync, existsSync } from "node:fs";
 
 const out = ".next/standalone";
+if (process.env.VERCEL) process.exit(0); // Vercel serves the build itself
 if (!existsSync(out)) throw new Error(`${out} is missing: is output: "standalone" set in next.config.ts?`);
 cpSync("public", `${out}/public`, { recursive: true });
 cpSync(".next/static", `${out}/.next/static`, { recursive: true });

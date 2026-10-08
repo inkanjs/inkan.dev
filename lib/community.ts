@@ -9,7 +9,11 @@ export type Contributor = { login: string; avatar: string; url: string; contribu
 
 async function json<T>(url: string): Promise<T | undefined> {
   try {
-    const res = await fetch(url, { headers: { accept: "application/vnd.github+json", "user-agent": "inkan.dev" }, signal: AbortSignal.timeout(8000) });
+    // a token (read-only, public repos) lifts GitHub's limit of 60 asks an hour per address
+    const token = process.env.GITHUB_TOKEN;
+    const headers: Record<string, string> = { accept: "application/vnd.github+json", "user-agent": "inkan.dev" };
+    if (token) headers.authorization = `Bearer ${token}`;
+    const res = await fetch(url, { headers, signal: AbortSignal.timeout(8000) });
     return res.ok ? ((await res.json()) as T) : undefined;
   } catch {
     return undefined;
