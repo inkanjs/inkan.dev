@@ -1,0 +1,66 @@
+---
+title: "Examples are tests"
+description: "Examples show up in the docs and run as tests."
+---
+
+```sh
+npx inkan check src/app.ts            # every route
+npx inkan check src/app.ts --only /teas
+npx inkan check src/app.ts --json     # for CI
+npx inkan check src/app.ts --strict   # a promised status without an example fails too
+```
+
+A route that promises a 404 no example ever shows is listed under the route,
+and on the docs page. Nothing tests that 404 yet; `--strict` turns it into a
+failure.
+
+The entry file exports the app (`export default app` or `export const app`).
+`app.listen()` stays quiet while the CLI loads it. If the examples change data,
+export a `beforeEach` that puts it back. It runs before every example:
+
+```ts
+export function beforeEach() {
+  store.reset();
+}
+```
+
+Or inside your own tests:
+
+```ts
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { app, beforeEach } from "./app.ts";
+
+test("the contract holds", async () => {
+  const report = await app.check({ beforeEach });
+  assert.equal(report.failed, 0);
+});
+```
+
+## Examples that build on each other
+
+"Create a tea, then fetch it" needs the id from the first answer. One example `keep`s it,
+the next one runs `after` it and uses it as a placeholder:
+
+```ts
+// POST /teas
+{ name: "a new oolong", body: { name: "Da Hong Pao", kind: "oolong" }, keep: { id: "body.id" } },
+
+// GET /teas/:id
+{ name: "the one just added", after: "POST /teas > a new oolong", params: { id: "{id}" }, expect: { name: "Da Hong Pao" } },
+```
+
+`keep` reads `body.…`, `headers.…` or `status`. A placeholder alone (`"{id}"`) keeps the
+value's type; inside text (`"/teas/{id}"`) it becomes text. `beforeEach` runs once before
+the whole chain, so the examples in it see each other's data, and the order comes from
+`after`, never from the order of the files. The docs page runs the chain too when you
+press send.
+
+For everything the examples do not cover, `app.inject()` sends a request
+straight in, without a socket:
+
+```ts
+const res = await app.inject({ method: "POST", url: "/teas", body: { name: "Gyokuro" } });
+res.status; // 400
+res.body.errors; // [{ in: "body", path: "kind", message: "is required" }, …]
+```

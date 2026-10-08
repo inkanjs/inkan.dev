@@ -1,0 +1,33 @@
+---
+title: "Typed client"
+description: "A client typed from the app itself, without code generation."
+---
+
+The contract already knows every path, input and answer, so a client can take its types
+from the app itself. No code generation, no OpenAPI step in between:
+
+```ts
+// server.ts: define the routes in a chain, so the type of `api` sees them
+export const api = inkan()
+  .get("/teas/:id", { params: t.object({ id: t.int() }), response: { 200: Tea, 404: t.problem() } }, getTea)
+  .post("/teas", { body: NewTea, response: { 201: Tea } }, addTea)
+  .mount("/admin", admin);
+
+// web.ts: only the type crosses over, none of the server
+import type { api } from "./server.ts";
+import { client } from "@vxnsin/inkan/client";
+
+const shop = client<typeof api>("https://shop.example.com", { headers: () => ({ authorization: `Bearer ${token}` }) });
+
+const res = await shop.get("/teas/:id", { params: { id: 1 } });
+if (res.ok) res.data.name;               // typed as the contract's Tea, Dates as strings
+else if (res.status === 404) res.problem; // every failure is a problem document, never a throw
+```
+
+A wrong path, a missing param or a body of the wrong shape does not compile. Check `ok`
+first: any status can also come from a proxy on the way, so `status` alone cannot promise
+which answer it is. The client is a few lines around `fetch` and runs anywhere fetch does;
+pass your own with `{ fetch }`.
+
+Routes written one statement at a time (`app.get(...);`) work as always, but their type
+cannot collect them: a type only grows along a chain.

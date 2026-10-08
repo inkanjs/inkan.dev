@@ -1,0 +1,11 @@
+{
+  "title": "Integrations",
+  "pages": [
+    "index",
+    "vite",
+    "next",
+    "query",
+    "uws",
+    "recipes"
+  ]
+}

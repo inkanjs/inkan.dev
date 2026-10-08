@@ -1,0 +1,21 @@
+{
+  "title": "inkan",
+  "pages": [
+    "index",
+    "installation",
+    "---Guide---",
+    "routes",
+    "schemas",
+    "examples",
+    "streams",
+    "client",
+    "middleware",
+    "hooks",
+    "---More---",
+    "seal",
+    "deploy",
+    "performance",
+    "integrations",
+    "cli"
+  ]
+}

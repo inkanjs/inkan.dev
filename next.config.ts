@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
+import { createMDX } from "fumadocs-mdx/next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // a server of its own, without node_modules next to it: what runs on the Pi under warden
+  output: "standalone",
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {
@@ -14,4 +16,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default createMDX()(nextConfig);

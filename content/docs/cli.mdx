@@ -1,0 +1,23 @@
+---
+title: "CLI"
+description: "inkan check, diff, examples, seal and learn."
+---
+
+```sh
+npx inkan check   src/app.ts [--only <text>] [--json] [--strict]
+npx inkan openapi src/app.ts [-o openapi.json]
+npx inkan routes  src/app.ts
+npx inkan diff    openapi.json src/app.ts [--json]
+npx inkan seal    src/app.ts [-o src/inkan.seal.js]
+npx inkan examples [name] [folder] [--list] [--force]
+```
+
+`inkan diff` compares a saved OpenAPI document with the app (or two documents) and names
+what would break a client written against the old one: a route or status that is gone, a
+field that is required now, a value a request may no longer send, a value an answer may
+send now. Requests may only get looser and answers only stricter; it exits with `1` when
+something breaks, so CI can ask for a major version.
+
+Exit codes: `0` everything sealed, `1` something broke, `2` the command was
+used wrong. Colours turn off when the output is not a terminal or `NO_COLOR`
+is set; `FORCE_COLOR` turns them on.

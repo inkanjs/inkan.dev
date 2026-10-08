@@ -1,26 +1,145 @@
 @import "tailwindcss";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
 
+/* The palette of the release pictures: warm dark paper, cream ink, seal red. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #f7f0e4;
+  --bg-deep: #efe5d4;
+  --ink: #1f1915;
+  --soft: #4a3f37;
+  --muted: #7d6f63;
+  --line: #ddcfba;
+  --card: #fbf6ee;
+  --term: #2a2421;
+  --term-bar: #312a26;
+  --term-ink: #ece1cf;
+  --seal: #c4381f;
+  --hot: #c4381f;
+  --ok: #3f8a52;
+  --glow: rgba(196, 56, 31, 0.14);
+}
+
+.dark {
+  --bg: #1a1614;
+  --bg-deep: #15110f;
+  --ink: #ece1cf;
+  --soft: #cbbda8;
+  --muted: #8a7d72;
+  --line: #3a312c;
+  --card: #221d1a;
+  --term: #2a2421;
+  --term-bar: #312a26;
+  --term-ink: #ece1cf;
+  --seal: #c4381f;
+  --hot: #e2583e;
+  --ok: #79c08a;
+  --glow: rgba(226, 88, 62, 0.18);
+}
+
+/* the docs (fumadocs) in the same paper and ink */
+:root {
+  --color-fd-background: var(--bg);
+  --color-fd-foreground: var(--ink);
+  --color-fd-muted: var(--bg-deep);
+  --color-fd-muted-foreground: var(--muted);
+  --color-fd-popover: var(--card);
+  --color-fd-popover-foreground: var(--ink);
+  --color-fd-card: var(--card);
+  --color-fd-card-foreground: var(--ink);
+  --color-fd-border: var(--line);
+  --color-fd-primary: var(--seal);
+  --color-fd-primary-foreground: #fbf1e6;
+  --color-fd-secondary: var(--bg-deep);
+  --color-fd-secondary-foreground: var(--ink);
+  --color-fd-accent: color-mix(in srgb, var(--seal) 12%, transparent);
+  --color-fd-accent-foreground: var(--ink);
+  --color-fd-ring: var(--hot);
+}
+.dark,
+.dark #nd-sidebar {
+  --color-fd-background: var(--bg);
+  --color-fd-foreground: var(--ink);
+  --color-fd-muted: var(--card);
+  --color-fd-muted-foreground: var(--muted);
+  --color-fd-popover: var(--card);
+  --color-fd-card: var(--card);
+  --color-fd-border: var(--line);
+  --color-fd-primary: var(--hot);
+  --color-fd-primary-foreground: #1a1614;
+  --color-fd-secondary: var(--card);
+  --color-fd-accent: color-mix(in srgb, var(--hot) 14%, transparent);
+  --color-fd-ring: var(--hot);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-bg-deep: var(--bg-deep);
+  --color-ink: var(--ink);
+  --color-soft: var(--soft);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-card: var(--card);
+  --color-term: var(--term);
+  --color-term-bar: var(--term-bar);
+  --color-term-ink: var(--term-ink);
+  --color-seal: var(--seal);
+  --color-hot: var(--hot);
+  --color-ok: var(--ok);
+  --font-sans: var(--font-sans-face), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono-face), ui-monospace, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+/* code never turns => into an arrow */
+code,
+pre,
+.font-mono {
+  font-variant-ligatures: none;
+}
+
+::selection {
+  background: var(--seal);
+  color: #fbf1e6;
+}
+
+/* the paper the landing page sits on: a warm glow in one corner, deeper in the other */
+.paper {
+  background:
+    radial-gradient(1100px 700px at 100% 0%, var(--glow) 0%, transparent 60%),
+    radial-gradient(900px 600px at 0% 100%, var(--bg-deep) 0%, transparent 70%),
+    var(--bg);
+}
+
+/* grain over everything, so the flat colours read like printed paper */
+.grain::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  z-index: 60;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

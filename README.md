@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# inkan.dev
 
-## Getting Started
+The website of [inkan](https://github.com/inkanjs/inkan), the API framework for Node where the
+docs can't lie: the landing page, the docs, and a playground that talks to a real inkan app.
 
-First, run the development server:
+It runs on Next.js, and its API is an inkan app (`server/app.ts`) served through
+[`@inkanjs/next`](https://github.com/inkanjs/integrations/tree/main/packages/next). The docs
+are MDX under `content/docs`, read by [Fumadocs](https://fumadocs.dev). The animations are
+[Motion](https://motion.dev), the clips under "under the hood" are
+[Remotion](https://www.remotion.dev) scenes played in the page.
 
-```bash
+## Develop
+
+```sh
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`http://localhost:3000` is the site, `/docs` the docs, `/api/docs` the docs of the playground
+API. `npm run check` runs the API's examples as tests.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Run it
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```sh
+npm ci
+npm run build
+npm start
+```
 
-## Learn More
+The build is a standalone Next.js server in `.next/standalone`, with `public/` and
+`.next/static` copied next to it: the folder is the whole site. `npm start` runs it on `PORT`
+(default 3000) and `HOSTNAME` (default `0.0.0.0`), so under
+[warden](https://github.com/vxnsin/warden) it is:
 
-To learn more about Next.js, take a look at the following resources:
+```sh
+warden run -- npm start
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Build on the machine it runs on (a Raspberry Pi builds it fine, only slower): the standalone
+folder carries the `node_modules` it needs, for the platform it was built on.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Layout
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+app/              pages: the landing page, /docs, /api (the inkan app), /api/search
+components/       the landing page's sections, the Remotion scenes, the code windows
+content/docs/     the docs, as MDX
+server/app.ts     the playground API, an inkan app
+scripts/          the step after next build that makes .next/standalone whole
+```

@@ -1,0 +1,37 @@
+---
+title: "Routes"
+description: "A route and its contract: params, query, body, responses."
+---
+
+```ts
+app.post(
+  "/teas",
+  {
+    summary: "Add a tea",
+    tags: ["teas"],
+    body: NewTea,
+    response: { 201: Tea, 409: t.problem() },
+    examples: [
+      { name: "a new oolong", body: { name: "Da Hong Pao", kind: "oolong" }, expect: { id: 2 } },
+      { name: "no name", body: { kind: "green" }, status: 400 },
+    ],
+  },
+  ({ body, reply }) => {
+    const tea = store.add(body);
+    return reply(201, tea, { location: `/teas/${tea.id}` });
+  },
+);
+```
+
+| field | |
+| --- | --- |
+| `params`, `query`, `headers`, `body` | schemas for the input. Header names are lowercase. |
+| `response` | status → schema. The first 2xx is the default status, and no body means 204. |
+| `examples` | `{ name, params, query, headers, body, status, expect, keep, after }`. `status` defaults to the first 2xx. `expect` is a part of the answer that has to be there. `keep` and `after` chain examples, see below. |
+| `summary`, `description`, `tags`, `deprecated`, `operationId` | for the docs |
+| `hidden` | keeps the route out of the docs and OpenAPI |
+| `use` | middleware for this route only, after validation |
+
+A handler returns a value, or `reply(status, body, headers)` for anything
+else. `ctx.reply` is typed to the statuses in the contract, so `reply(418)`
+on a route that never promised a teapot does not compile.
