@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from "fumadocs-ui/page";
 import defaultMdxComponents, { createRelativeLink } from "fumadocs-ui/mdx";
+import * as Twoslash from "fumadocs-twoslash/ui";
 import { source } from "@/lib/source";
 
 export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
@@ -14,7 +15,7 @@ export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
       <DocsBody>
-        <MDX components={{ ...defaultMdxComponents, a: createRelativeLink(source, page) }} />
+        <MDX components={{ ...defaultMdxComponents, ...Twoslash, a: createRelativeLink(source, page) }} />
       </DocsBody>
     </DocsPage>
   );
