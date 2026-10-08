@@ -1,23 +1,27 @@
 {
   "title": "inkan",
   "pages": [
+    "---Getting started---",
     "index",
     "installation",
-    "---Guide---",
+    "deploy",
+    "---Concepts---",
     "routes",
-    "schemas",
     "examples",
+    "seal",
+    "performance",
+    "---API---",
+    "...api",
+    "---Guides---",
+    "schemas",
     "streams",
     "client",
     "middleware",
     "hooks",
-    "---Reference---",
-    "api",
-    "---More---",
-    "seal",
-    "deploy",
-    "performance",
-    "integrations",
-    "cli"
+    "cli",
+    "---Middleware---",
+    "...built-in",
+    "---Integrations---",
+    "...integrations"
   ]
 }

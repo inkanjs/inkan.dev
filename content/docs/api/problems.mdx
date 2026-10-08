@@ -1,0 +1,72 @@
+---
+title: "Problems"
+description: "How inkan answers when something is wrong: RFC 9457 problem documents."
+---
+
+```ts
+import { problem } from "@vxnsin/inkan";
+
+app.post("/teas", { body: NewTea }, ({ body }) => {
+  if (store.has(body.name)) throw problem(409, "taken", `There is a tea called ${body.name}`, { name: body.name });
+  return store.add(body);
+});
+```
+
+Every error inkan answers with is a problem document, `application/problem+json`, as
+RFC 9457 describes it: a stable `type` a client can switch on, a `title`, the `status`, a
+`detail` for people, and the request's `instance` and `requestId`.
+
+```json
+{
+  "type": "taken",
+  "title": "Conflict",
+  "status": 409,
+  "detail": "There is a tea called Sencha",
+  "name": "Sencha",
+  "instance": "/teas",
+  "requestId": "0k3f9a2-1c8"
+}
+```
+
+## problem()
+
+```ts
+problem(status, type, detail?, extra?)
+```
+
+Makes one. Thrown anywhere on the way, in a handler, a hook or a middleware, it becomes the
+answer. `extra` adds fields of your own. Headers go on `p.headers`:
+
+```ts
+const p = problem(429, "slow-down", "Try again in a minute");
+p.headers["retry-after"] = "60";
+throw p;
+```
+
+## The ones inkan sends by itself
+
+| status | type | when |
+| --- | --- | --- |
+| 400 | `validation` | the input breaks the contract; `errors` lists every field, with `in`, `path` and `message` |
+| 400 | `invalid-json`, `invalid-multipart` | a body that cannot be read |
+| 401 | `unauthorized` | the route asks for credentials the request does not carry |
+| 404 | `not-found` | no route for the path, or `ctx.notFound()` |
+| 405 | `method-not-allowed` | the path exists, the method does not; `allow` names the ones it takes |
+| 413 | `body-too-large` | past the route's body limit |
+| 415 | `unsupported-media-type` | a body of a type the route does not take |
+| 500 | `internal` | anything else thrown; the detail only in development, and `onError` sees it |
+| 500 | `response-contract` | in development: the handler answered with something its contract does not promise |
+| 504 | `timeout` | past the route's `timeout` (**0.7.0**) |
+
+## onProblem()
+
+```ts
+app.onProblem((ctx, p) => {
+  if (p.status === 404) return problem(404, "not-found", "Nothing here. Try /docs");
+  if (p.status >= 500) report(p, ctx.id);
+});
+```
+
+Sees every problem before it becomes the answer, and may change it or return another. A
+route that lists `400: t.problem()` or `404: t.problem()` in its contract shows them in the
+docs and in OpenAPI; a route with input promises a 400 without saying so.

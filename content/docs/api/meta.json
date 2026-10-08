@@ -1,4 +1,10 @@
 {
-  "title": "API reference",
-  "pages": ["app", "routes", "context", "schemas", "plugins"]
+  "title": "API",
+  "pages": [
+    "app",
+    "routing",
+    "context",
+    "schemas",
+    "problems"
+  ]
 }

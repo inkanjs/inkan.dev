@@ -1,0 +1,32 @@
+---
+title: "Rate limit"
+description: "At most so many requests per client and window."
+---
+
+```ts
+import { rateLimit } from "@vxnsin/inkan";
+
+app.register(rateLimit({ max: 120 })); // 120 a minute, per client
+```
+
+At most `max` requests per client per `window`. The one after gets a 429 problem, `rate-limited`,
+with `retry-after`, and every answer says how many are left in `x-ratelimit-limit` and
+`x-ratelimit-remaining`. It is a shared plugin: registered on the app it counts every route,
+inside a plugin only that plugin's routes.
+
+```ts
+app.register((auth) => {
+  auth.register(rateLimit({ max: 5 }));      // five login attempts a minute
+  auth.post("/login", { body: Login }, login);
+});
+```
+
+## Options
+
+| option | default | |
+| --- | --- | --- |
+| `max` | | requests a client may make per window |
+| `window` | one minute | the window in milliseconds |
+| `key` | `ctx.ip` | who counts as one client: `(ctx) => string`, e.g. a user id or an API key |
+
+The counts live in memory, in each process: with `workers`, each worker counts for itself.

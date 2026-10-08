@@ -1,0 +1,194 @@
+---
+title: "Routing"
+description: "Paths, params, groups, and everything a route can say about itself."
+---
+
+```ts
+app.get("/teas/:id", {
+  params: t.object({ id: t.int() }),
+  response: { 200: Tea, 404: t.problem() },
+}, ({ params, notFound }) => findTea(params.id) ?? notFound());
+```
+
+A route is a method, a path, a spec and a handler. The spec is the contract: what comes in,
+what goes out, and a few examples. Everything below is optional.
+
+## Paths
+
+```ts
+app.get("/teas", list);             // a path
+app.get("/teas/:id", one);          // a param: params.id
+app.get("/files/*path", file);      // the rest of the path: params.path
+app.get("/teas/new", form);         // wins over /teas/:id, in any order
+```
+
+Static segments win over params, and params over the rest, so `/teas/new` and
+`/teas/:id` can live side by side. A path without params is found with one lookup.
+
+## params, query, headers
+
+```ts
+app.get("/teas", {
+  query: t.object({ page: t.int().default(1), kind: t.enum(["green", "black"]).optional() }),
+  headers: t.object({ "x-shop": t.string() }),
+}, ({ query, headers }) => list(query.page, query.kind, headers["x-shop"]));
+```
+
+Params, query and headers arrive as text and are turned into what the schema asks for:
+`?page=2` is the number 2, `?tag=a&tag=b` a list. A value that does not fit is a 400 problem
+that names it, before the handler runs.
+
+## body
+
+```ts
+app.post("/teas", { body: t.object({ name: t.string().min(1), grams: t.int().min(1) }) }, ({ body }) => store.add(body));
+```
+
+JSON, a form or multipart, read and checked before the handler; a `t.file()` in the schema
+takes a file from a multipart body. `t.binary()` takes the bytes as they are, and
+`t.stream()` hands them to the handler unread, for uploads larger than memory.
+
+## bodyLimit
+
+```ts
+app.post("/invoices", { body: t.binary().max(20 * 1024 * 1024) }, ({ body }) => store(body));
+app.post("/notes", { bodyLimit: 64 * 1024, body: Note }, add);
+```
+
+The largest body a route takes, instead of the app's (1 MiB by default). The `max` of a
+`t.binary()` or `t.stream()` is its limit. A body that says it is larger is a 413 at once.
+
+## response
+
+```ts
+response: { 200: Tea, 201: Tea, 404: t.problem() }
+```
+
+Status → schema. The first 2xx is the status a plain value answers with, and no body means
+204. Only what the schema lists leaves the server, in production too: a field the contract
+does not name never goes out by accident. In development the answer is also checked, and
+one that breaks the contract is a 500 with a message saying which field.
+
+## responseHeaders
+
+```ts
+responseHeaders: { 201: { location: t.string() } }
+```
+
+Headers an answer promises. In development a missing or wrong one is a 500.
+
+## examples
+
+```ts
+examples: [
+  { name: "found", params: { id: 1 } },
+  { name: "missing", params: { id: 99 }, status: 404 },
+]
+```
+
+The docs page shows them, and `inkan check` runs every one as a test. See
+[Examples are tests](/docs/examples).
+
+## security
+
+```ts
+security: "bearer" // or "basic", { apiKey: "x-key", in: "header" }, a list of them, or false
+```
+
+The credentials a route asks for. A request without them is a 401 before its input is
+read. Whether they are good is for your hook or handler to say.
+
+## timeout <small>0.7.0</small>
+
+```ts
+app.get("/report", { timeout: 600_000 }, ({ signal }) => report(signal));
+```
+
+Milliseconds the handler may take. Past them the answer is a 504 problem and `ctx.signal`
+is aborted, so a database query behind it can stop. The app's `timeout` is the default.
+
+## cache <small>0.7.0</small>
+
+```ts
+app.get("/stock/:id", { params, cache: { seconds: 600 } }, ({ params }) => stock(params.id));
+```
+
+Keeps the handler's answers: the same params and query within the time get the same answer
+without the handler, and requests that come in while it is still being worked out wait for
+that one answer instead of each asking the database again.
+
+| option | default | |
+| --- | --- | --- |
+| `seconds` | | how long an answer is kept |
+| `shared` | `false` | the same for everybody; otherwise the authorization and cookie headers are part of the key, so one user never gets another's answer |
+| `max` | 1000 | answers kept per route; past it the oldest goes |
+
+A handler that throws keeps nothing. The cache lives in the memory of each process.
+
+## use
+
+```ts
+app.get("/teas", { use: [audit] }, list);
+```
+
+Middleware for this route only, after its input was checked.
+
+## summary, description, tags, operationId, deprecated, hidden
+
+For the docs page and OpenAPI; `hidden` keeps a route out of both.
+
+## What a handler returns
+
+| returned | goes out as |
+| --- | --- |
+| an object or an array | JSON, trimmed to the contract |
+| a string | text/plain |
+| `` html`…` `` <small>0.7.0</small> | text/html |
+| `reply(status, body, headers?)` | another status or extra headers, typed to the contract |
+| `sse(source)` | server-sent events, each one checked against `t.events(...)` |
+| a generator of rows, for an array in the contract <small>0.7.0</small> | JSON written row by row, or NDJSON |
+| bytes, or a stream of bytes | as they are |
+| nothing | 204 |
+
+## Rows, as they come <small>0.7.0</small>
+
+```ts
+app.get("/articles", { response: { 200: t.array(Article) } }, async function* ({ signal }) {
+  for await (const row of db.query("select * from articles", { signal })) yield row;
+});
+```
+
+A list given row by row never sits in memory whole. Every row is written by the item's
+writer as it comes, so it holds only what the contract lists; in development each one is
+checked, and a row that breaks the contract ends the answer early, so no client takes a part
+for the whole. A client that sends `accept: application/x-ndjson` gets one JSON line per row.
+
+## Groups
+
+```ts
+import { routes } from "@vxnsin/inkan";
+
+const admin = routes().security("bearer").use(audit).get("/stats", stats);
+app.mount("/admin", admin);
+```
+
+`routes()` makes a group with middleware and credentials of its own; `mount()` puts it
+under a prefix, types and all. For hooks and decorations of their own, use a
+[plugin](/docs/api/app#register).
+
+## Routes from files
+
+```ts
+// routes/teas/[id].ts
+import { route, t } from "@vxnsin/inkan";
+
+export const GET = route({ params: t.object({ id: t.int() }) }, ({ params }) => findTea(params.id));
+```
+
+```ts
+app.load(new URL("./routes", import.meta.url));
+```
+
+`routes/teas/[id].ts` is `/teas/:id`, and `routes/files/[...rest].ts` is `/files/*rest`.
+Each file exports its methods, made with `route()` so the handler is typed from its
+contract.

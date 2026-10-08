@@ -1,81 +1,224 @@
 ---
-title: "The app"
-description: "inkan(options): every option, and every method the app has."
+title: "App"
+description: "inkan(): the app, its options, and everything it can do."
 ---
 
 ```ts
-import { inkan } from "@vxnsin/inkan";
+import { inkan, t } from "@vxnsin/inkan";
 
-const app = inkan({ title: "Tea Shop", version: "1.0.0" });
+const app = inkan({ title: "Tea Shop", version: "1.0.0" })
+  .get("/hello", () => ({ hello: "world" }));
+
+await app.listen(3000);
 ```
 
-`inkan(options)` makes an app. Everything an app does with routes, hooks and plugins, a
-scope from `register` does too; what only the app has is marked as such.
-
-## Options
-
-| option | default | what it does |
-| --- | --- | --- |
-| `title`, `version`, `description`, `servers` | | for the OpenAPI document and the docs page |
-| `docs` | `"/docs"` | where the docs page lives, or `false` |
-| `openapi` | `"/openapi.json"` | where the OpenAPI document lives, or `false` |
-| `inspector` | `"/_inkan"` in development | the request inspector, loopback only, or `false` |
-| `validateResponses` | on in development | checks what handlers return against `response` |
-| `bodyLimit` | `1048576` (1 MiB) | the largest request body in bytes; a route can have its own |
-| `timeout` | none | milliseconds a handler may take before a 504 (**0.7.0**) |
-| `log` | `"pretty"` in development, `"json"` in production | one line per request, or `false` |
-| `logger` | | takes every log entry instead of the console |
-| `requestId` | `"x-request-id"` | the header that carries the request id, or `false` |
-| `gracefulShutdown` | `true` | finishes open requests on SIGINT and SIGTERM |
-| `workers` | one process | `"auto"` or a number: one process per core, one port |
-| `dev` | `NODE_ENV !== "production"` | development mode |
-| `onError` | `console.error` | sees every error that becomes a 500 |
-| `seal` | | the contracts `inkan seal` stamped into code |
+`inkan(options)` makes an app. Routes, hooks, decorations and plugins are added to it in a
+chain, and each one returns the app, so the type of the app grows with every route. That
+type is what the [typed client](/docs/client) reads.
 
 ## Routes
 
-| method | |
+```ts
+app.get("/teas", () => store.all());
+app.post("/teas", { body: NewTea, response: { 201: Tea } }, ({ body, reply }) => reply(201, store.add(body)));
+app.put("/teas/:id", spec, handler);
+app.patch("/teas/:id", spec, handler);
+app.delete("/teas/:id", spec, handler);
+```
+
+One method per HTTP method: the path, the spec (optional) and the handler. A HEAD request
+is answered by the GET route of its path, without the body. An OPTIONS request gets the
+methods the path takes. [Routing](/docs/api/routing) has everything a spec can say.
+
+## use()
+
+```ts
+app.use(async (ctx, next) => {
+  const started = Date.now();
+  await next();
+  ctx.header("x-took", `${Date.now() - started}ms`);
+});
+```
+
+Middleware for every request, before routing. On a group made with `routes()`, it runs
+for the routes of that group, after their input was checked.
+
+## onRequest(), preHandler(), onSend(), onResponse(), onProblem()
+
+```ts
+app
+  .onRequest((ctx) => {
+    if (!ctx.headers.authorization) throw problem(401, "unauthorized");
+  })
+  .onSend((ctx, answer) => {
+    answer.headers["x-frame-options"] = "DENY";
+  })
+  .onProblem((ctx, p) => {
+    if (p.status >= 500) report(p);
+  });
+```
+
+Hooks run for the routes of their scope, in this order:
+
+| hook | runs |
 | --- | --- |
-| `get`, `post`, `put`, `patch`, `delete` `(path, spec?, handler)` | a route; see [Routes](/docs/api/routes) |
-| `use(...middleware)` | middleware for the routes after it; on the app, for every request |
-| `security(scheme)` | the credentials the routes after it ask for |
-| `mount(prefix, routes)` | a group made with `routes()`, under a prefix, types and all |
-| `load(folder)` | a route for every file in a folder |
+| `onRequest` | once a route is found, before the body is read. Return a value to answer at once. |
+| `preHandler` | after the input is checked, before the handler. |
+| `onSend` | on every answer before it is written, problems too. It may change the answer or return another. |
+| `onResponse` | after the answer is written: metrics, audit logs. It cannot change anything any more. |
+| `onProblem` | on every problem before it becomes the answer. It may change it or return another. |
 
-## Hooks and plugins
+A route with no hooks anywhere above it takes the fast path, with no hook machinery at all.
 
-| method | runs |
-| --- | --- |
-| `onRequest(fn)` | once a route is found, before the body is read; return a value to answer at once |
-| `preHandler(fn)` | after the input is checked, before the handler |
-| `onSend(fn)` | on every answer before it is written; may change it |
-| `onResponse(fn)` | after the answer is written: metrics, audit logs |
-| `onProblem(fn)` | on every problem before it becomes an answer |
-| `register(plugin, options?)` | a plugin, in a scope of its own, or in the same one for `plugin(fn, { shared: true })` |
-| `decorate(name, value)` | a value on every context of the scope: `ctx.db` |
-| `layout(fn)` | how the pages of the scope look around `ctx.render(...)` (**0.7.0**) |
+## register()
 
-Hooks, decorations and layouts reach the routes of their scope and the scopes inside it,
-and nothing outside.
+```ts
+import { plugin } from "@vxnsin/inkan";
 
-## Running it (the app only)
+const admin = plugin((scope, options: { token: string }) => {
+  scope.onRequest((ctx) => {
+    if (ctx.headers.authorization !== `Bearer ${options.token}`) throw problem(401, "unauthorized");
+  });
+  scope.get("/stats", () => stats());
+});
 
-| method | |
-| --- | --- |
-| `listen(port?, host?)` | starts the server; the port comes from the argument, then `$PORT`, then 3000 |
-| `listener` | a plain `(req, res)` function, for your own `http.createServer` |
-| `fetch(request, { remote? })` | Request in, Response out: Bun, Deno, serverless |
-| `exchange(request)` | plain values in and out, for an adapter to another server |
-| `bodyFor(method, url)` | for adapters: the body limit, and whether the body goes unread |
-| `onListen(fn)`, `onClose(fn)` | open and close what the app needs around running |
-| `ready()` | resolves once every plugin has loaded |
+app.register(admin, { prefix: "/admin", token: process.env.ADMIN_TOKEN! });
+```
 
-## Testing and tooling (the app only)
+A plugin gets a scope of its own: its hooks, decorations and layout reach the routes defined
+inside it and nothing outside. Made with `plugin(fn, { shared: true })`, it acts on the
+scope it is registered in instead, which is right for a plugin like a rate limit.
+Plugins run in the order they are registered; one that returns a promise holds back the
+ones after it, and `listen()` waits for all of them.
 
-| method | |
-| --- | --- |
-| `inject({ method, url, headers, body })` | a request straight into the app, no port; answers `{ status, headers, cookies, text, body }` |
-| `check(options?)` | runs every route's examples as tests |
-| `openapi()` | the OpenAPI 3.1 document |
-| `routes()` | every route, as inkan sees it |
-| `sealed()` | how the seal went: how many contracts run on it, and which changed |
+## decorate()
+
+```ts
+app.decorate("db", openDatabase());
+app.get("/teas", ({ db }) => db.teas.all()); // typed
+```
+
+Puts a value on every context of the scope, once, on the context's prototype: it costs
+nothing per request. A name the context already has is refused.
+
+## layout() <small>0.7.0</small>
+
+```ts
+app.layout((content, { title }) => html`<!doctype html><title>${title}</title><main>${content}</main>`);
+```
+
+How the pages of the scope look around what [`ctx.render()`](/docs/api/context#render)
+hands in. A plugin can have its own, and the closest one wins.
+
+## security()
+
+```ts
+app.security("bearer").get("/me", ({ headers }) => me(headers.authorization));
+```
+
+The credentials the routes after it ask for: `"bearer"`, `"basic"`, `{ apiKey, in }`, or a
+list of them. A request without them is a 401 before its input is read; OpenAPI and the
+docs page list them. Whether the credentials are good is for your hook or handler to say.
+
+## mount()
+
+```ts
+import { routes } from "@vxnsin/inkan";
+
+const teas = routes().get("/", list).get("/:id", spec, one);
+app.mount("/teas", teas);
+```
+
+A group made with `routes()`, under a prefix, with its types: the typed client knows its
+routes too.
+
+## load()
+
+```ts
+app.load(new URL("./routes", import.meta.url));
+```
+
+A route for every file in a folder: `teas/[id].ts` exporting `GET` is `GET /teas/:id`.
+
+## listen()
+
+```ts
+await app.listen();             // $PORT, or 3000
+await app.listen(8080, "0.0.0.0");
+```
+
+Starts the server once every plugin has loaded. The port comes from the argument, then
+`$PORT`, then 3000. On SIGINT or SIGTERM it lets open requests finish, up to ten seconds.
+
+## onListen(), onClose()
+
+```ts
+app.onListen(() => db.connect()).onClose(() => db.end());
+```
+
+`onListen` is awaited before `listen()` resolves, and a throw there stops the start.
+`onClose` runs after the last request on shutdown.
+
+## fetch()
+
+```ts
+Bun.serve({ fetch: (req, server) => app.fetch(req, { remote: server.requestIP(req)?.address }) });
+Deno.serve((req, info) => app.fetch(req, { remote: info.remoteAddr.hostname }));
+export default { fetch: (req: Request) => app.fetch(req) }; // serverless
+```
+
+The app as a web-standard handler: a Request in, a Response out.
+
+## listener, exchange(), bodyFor()
+
+```ts
+http.createServer(app.listener).listen(3000);
+```
+
+`listener` is a plain Node `(req, res)` function. `exchange(request)` takes and gives plain
+values, which is all an adapter to another server needs, and `bodyFor(method, url)` tells
+such an adapter how much body a route takes, and whether it reads it itself.
+
+## inject()
+
+```ts
+const res = await app.inject({ method: "POST", url: "/teas", body: { name: "Sencha" } });
+res.status; // 201
+res.body;   // the parsed JSON
+```
+
+A request straight into the app, with no port and no network: for tests. It answers
+`{ status, headers, cookies, text, body }`.
+
+## check()
+
+```ts
+const report = await app.check();
+```
+
+Runs every route's examples against the app, as `inkan check` does from the command line.
+
+## openapi(), routes(), sealed()
+
+`openapi()` is the OpenAPI 3.1 document, `routes()` every route as inkan sees it, and
+`sealed()` how the seal went: how many contracts run on it, and which changed since.
+
+## Options
+
+| option | default | |
+| --- | --- | --- |
+| `title`, `version`, `description`, `servers` | | for OpenAPI and the docs page |
+| `docs` | `"/docs"` | the docs page, or `false` |
+| `openapi` | `"/openapi.json"` | the OpenAPI document, or `false` |
+| `inspector` | `"/_inkan"` in development | the request inspector, loopback only, or `false` |
+| `validateResponses` | on in development | checks what handlers return against `response` |
+| `bodyLimit` | 1 MiB | the largest request body in bytes; a route can have its own |
+| `timeout` <small>0.7.0</small> | none | milliseconds a handler may take before a 504 |
+| `log` | `"pretty"` in development, `"json"` in production | one line per request, or `false` |
+| `logger` | | takes every log entry instead of the console |
+| `requestId` | `"x-request-id"` | the header for the request id, or `false` |
+| `gracefulShutdown` | `true` | lets open requests finish on SIGINT and SIGTERM |
+| `workers` | one process | `"auto"` or a number: a process per core, one port |
+| `dev` | `NODE_ENV !== "production"` | development mode |
+| `onError` | `console.error` | sees every error that becomes a 500 |
+| `seal` | | the contracts `inkan seal` stamped into code |

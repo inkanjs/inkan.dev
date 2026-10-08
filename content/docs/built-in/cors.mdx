@@ -1,0 +1,33 @@
+---
+title: "CORS"
+description: "Lets pages on other origins call the API."
+---
+
+```ts
+import { cors } from "@vxnsin/inkan";
+
+app.use(cors({ origin: "https://shop.example", credentials: true }));
+```
+
+Answers preflight requests and puts the `access-control-*` headers on every answer, so a
+page on another origin may call the API from the browser. Use it on the app for every
+route, or on a group made with `routes()` for some of them.
+
+## Options
+
+| option | default | |
+| --- | --- | --- |
+| `origin` | `"*"` | which origins may call: one, a list, or a function `(origin) => boolean` |
+| `credentials` | `false` | lets the browser send cookies and auth headers; the origin is then echoed instead of `*`, with `vary: origin` |
+| `maxAge` | | seconds the browser may reuse a preflight answer |
+| `methods` | every method inkan routes | the methods a preflight allows |
+| `allowHeaders` | whatever the browser asks for | the request headers a preflight allows |
+| `exposeHeaders` | | response headers the page may read besides the simple ones |
+
+## Examples
+
+```ts
+app.use(cors({ origin: ["https://shop.example", "https://admin.shop.example"] }));
+app.use(cors({ origin: (o) => o.endsWith(".shop.example"), maxAge: 600 }));
+app.use(cors({ exposeHeaders: ["x-request-id"] }));
+```

@@ -1,0 +1,25 @@
+---
+title: "Compress"
+description: "Brotli or gzip, as the client takes it."
+---
+
+```ts
+import { compress } from "@vxnsin/inkan";
+
+app.register(compress());
+```
+
+Compresses answers with brotli or gzip, whichever the client's `accept-encoding` takes, and
+says so in `content-encoding` and `vary`. Streams are compressed as they go; server-sent
+events are left alone, so every event arrives when it is sent. Small bodies, HEAD, 204 and
+304 go as they are.
+
+## Options
+
+| option | default | |
+| --- | --- | --- |
+| `threshold` | 1024 | bodies smaller than this many bytes go as they are |
+| `encodings` | `["br", "gzip"]` | which encodings to offer, best first |
+| `filter` | text, JSON, JavaScript, XML, SVG, WebAssembly | `(contentType) => boolean`: whether a media type is worth compressing |
+
+Behind a proxy that compresses already, leave it out.

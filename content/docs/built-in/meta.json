@@ -1,0 +1,4 @@
+{
+  "title": "Middleware",
+  "pages": ["cors", "rate-limit", "compress", "static"]
+}

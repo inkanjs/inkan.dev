@@ -1,0 +1,29 @@
+---
+title: "Static files"
+description: "The built frontend next to the API, with the fallback a single-page app needs."
+---
+
+```ts
+import { compress, serveStatic } from "@vxnsin/inkan";
+
+app
+  .register(compress())
+  .register(serveStatic({ dir: "client/dist", spa: true, exclude: ["/api"] }));
+```
+
+Serves the files of a folder. Every route of the app wins against them. A hashed asset under
+`/assets/` is cached for a year; everything else, and the page itself, is asked for again
+(`no-cache`), with an ETag and a 304 when nothing changed. Nothing outside the folder and no
+dotfile is ever served.
+
+## Options
+
+| option | default | |
+| --- | --- | --- |
+| `dir` | | the folder the files come from |
+| `prefix` | `/` | where they are served |
+| `spa` | `false` | for a single-page app: a GET that finds no file gets `index.html` (or the file named), with `no-cache` |
+| `exclude` | | paths that stay out of the fallback and answer 404, like `["/api"]`, so a mistyped API call is not handed a page |
+| `immutable` | a path under `/assets/` | files that never change under their name: a regular expression or `(path) => boolean` |
+| `maxAge` | 0 | `max-age` in seconds for every other file |
+| `index` | `index.html` | the file a folder answers with |
