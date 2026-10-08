@@ -2,6 +2,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { direct } from "@inkanjs/next";
 import { Footer, Nav } from "@/components/landing/chrome";
+import { Smooth } from "@/components/landing/smooth";
 import { Hero } from "@/components/landing/hero";
 import { Contract } from "@/components/landing/contract";
 import { Playground } from "@/components/landing/playground";
@@ -24,6 +25,7 @@ async function Shelf() {
 export default function Home() {
   return (
     <div className="paper grain flex min-h-screen flex-col">
+      <Smooth />
       <Nav />
       <main className="flex-1">
         <Hero />

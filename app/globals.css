@@ -112,12 +112,34 @@ pre,
   color: #fbf1e6;
 }
 
-/* the paper the landing page sits on: a warm glow in one corner, deeper in the other */
+/* the paper the landing page sits on: a warm glow in one corner, deeper in the other.
+   Its colour follows the section in the middle of the screen (data-tone, see smooth.tsx). */
 .paper {
-  background:
+  background-color: var(--tone, var(--bg));
+  background-image:
     radial-gradient(1100px 700px at 100% 0%, var(--glow) 0%, transparent 60%),
-    radial-gradient(900px 600px at 0% 100%, var(--bg-deep) 0%, transparent 70%),
-    var(--bg);
+    radial-gradient(900px 600px at 0% 100%, var(--bg-deep) 0%, transparent 70%);
+  background-attachment: fixed;
+  transition: background-color 0.7s ease;
+}
+/* light: from paper to a warmer, then a deeper paper, and a breath of the seal for the numbers */
+[data-tone="contract"] { --tone: #f4eadb; }
+[data-tone="playground"] { --tone: #efe4d2; }
+[data-tone="clips"] { --tone: #e8dcc8; }
+[data-tone="bench"] { --tone: #f5e4d8; }
+[data-tone="integrations"] { --tone: #f2e9da; }
+[data-tone="learn"] { --tone: #ede2cf; }
+/* dark: the clips play in the darkest room, the numbers glow a little red */
+.dark[data-tone="contract"] { --tone: #1e1815; }
+.dark[data-tone="playground"] { --tone: #161210; }
+.dark[data-tone="clips"] { --tone: #100c0b; }
+.dark[data-tone="bench"] { --tone: #24150f; }
+.dark[data-tone="integrations"] { --tone: #1b1715; }
+.dark[data-tone="learn"] { --tone: #14100e; }
+
+/* Lenis scrolls the page itself; the browser's own smoothing would fight it */
+html.lenis {
+  scroll-behavior: auto;
 }
 
 /* grain over everything, so the flat colours read like printed paper */
@@ -143,3 +165,4 @@ pre,
     transition-duration: 0.01ms !important;
   }
 }
+

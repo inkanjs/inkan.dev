@@ -70,7 +70,7 @@ export function Playground() {
   }
 
   return (
-    <section id="playground" className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8">
+    <section id="playground" data-tone="playground" className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8">
       <p className="font-mono text-sm text-hot">印 live</p>
       <h2 className="mt-3 font-mono text-3xl font-extrabold sm:text-4xl">Talk to a real inkan app.</h2>
       <p className="mt-4 max-w-2xl text-soft">

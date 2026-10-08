@@ -24,7 +24,7 @@ export function Bench() {
   const still = useReducedMotion();
   const on = seen || still;
   return (
-    <section id="bench" className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8">
+    <section id="bench" data-tone="bench" className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8">
       <p className="font-mono text-sm text-hot">印 how fast</p>
       <h2 className="mt-3 font-mono text-3xl font-extrabold sm:text-4xl">All of that, neck and neck with Fastify.</h2>
       <p className="mt-4 max-w-2xl text-soft">
@@ -117,7 +117,7 @@ export function Integrations() {
   const [active, setActive] = useState(0);
   const it = INTEGRATIONS[active];
   return (
-    <section id="integrations" className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8">
+    <section id="integrations" data-tone="integrations" className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8">
       <p className="font-mono text-sm text-hot">印 integrations</p>
       <h2 className="mt-3 font-mono text-3xl font-extrabold sm:text-4xl">inkan where you already are.</h2>
       <p className="mt-4 max-w-2xl text-soft">
@@ -182,7 +182,7 @@ export function Learn() {
   const still = useReducedMotion();
   const on = seen || still;
   return (
-    <section id="learn" className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8">
+    <section id="learn" data-tone="learn" className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8">
       <div ref={ref} className="grid items-center gap-10 lg:grid-cols-2">
         <div>
           <p className="font-mono text-sm text-hot">印 inkan learn</p>

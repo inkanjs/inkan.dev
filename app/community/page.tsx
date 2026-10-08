@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { People } from "@/components/community/people";
 import { Footer, Nav } from "@/components/landing/chrome";
+import { Smooth } from "@/components/landing/smooth";
 import { contributors, numbers, PACKAGES } from "@/lib/community";
 import { sponsors } from "@/data/sponsors";
 
@@ -52,6 +53,7 @@ const JOIN = [
 export default function Community() {
   return (
     <div className="paper grain flex min-h-screen flex-col">
+      <Smooth />
       <Nav />
       <main className="mx-auto w-full max-w-6xl flex-1 px-5 sm:px-8">
         <section className="pb-12 pt-16 lg:pt-24">

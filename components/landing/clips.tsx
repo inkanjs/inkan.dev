@@ -58,7 +58,7 @@ export function Clips() {
   }, [player, seen, still, ended]);
 
   return (
-    <section id="clips" className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8">
+    <section id="clips" data-tone="clips" className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8">
       <p className="font-mono text-sm text-hot">印 under the hood</p>
       <h2 className="mt-3 font-mono text-3xl font-extrabold sm:text-4xl">Fast, and still honest.</h2>
 

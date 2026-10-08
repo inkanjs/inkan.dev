@@ -97,7 +97,7 @@ export function Hero() {
   const [landed, setLanded] = useState(Boolean(still));
 
   return (
-    <section className="relative mx-auto grid w-full max-w-6xl items-center gap-12 px-5 pb-20 pt-16 sm:px-8 lg:grid-cols-[1.05fr_1fr] lg:pt-24">
+    <section data-tone="hero" className="relative mx-auto grid w-full max-w-6xl items-center gap-12 px-5 pb-20 pt-16 sm:px-8 lg:grid-cols-[1.05fr_1fr] lg:pt-24">
       <div>
         <div className="relative mb-8 h-24 w-24">
           {/* the ink that spreads where the seal lands */}

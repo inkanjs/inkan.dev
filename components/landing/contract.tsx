@@ -30,7 +30,7 @@ export function Contract() {
   const on = seen || still;
 
   return (
-    <section id="contract" className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8">
+    <section id="contract" data-tone="contract" className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8">
       <p className="font-mono text-sm text-hot">印 one contract</p>
       <h2 className="mt-3 max-w-2xl font-mono text-3xl font-extrabold leading-tight sm:text-4xl">Write it once. Everything else follows.</h2>
       <p className="mt-4 max-w-2xl text-soft">
