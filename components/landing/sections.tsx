@@ -4,19 +4,14 @@ import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/rea
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { Code, Window } from "@/components/code";
+import { servers } from "@/data/bench";
 
 /* ---------- how fast ---------- */
 
-// The fair bench from the inkan README: requests per second against plain node:http = 100,
-// every server running at once, measurements interleaved.
-const BENCH = [
-  { name: "inkan on uWS", score: 133.5, ours: true },
-  { name: "node:http", score: 100, base: true },
-  { name: "Fastify", score: 88.1 },
-  { name: "inkan", score: 85.4, ours: true },
-  { name: "Hono", score: 85.0 },
-  { name: "Express", score: 40.6 },
-];
+// The same numbers as /benchmarks (data/bench.ts): requests per second against plain
+// node:http = 100, every server running at once, measurements interleaved.
+const SHORT: Record<string, string> = { "inkan on uWebSockets.js": "inkan on uWS", "node:http, by hand": "node:http" };
+const BENCH = servers.map((s) => ({ name: SHORT[s.name] ?? s.name, score: s.score, ours: s.ours, base: s.base }));
 
 export function Bench() {
   const ref = useRef<HTMLDivElement>(null);
@@ -26,7 +21,7 @@ export function Bench() {
   return (
     <section id="bench" data-tone="bench" className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8">
       <p className="font-mono text-sm text-hot">印 how fast</p>
-      <h2 className="mt-3 font-mono text-3xl font-extrabold sm:text-4xl">All of that, neck and neck with Fastify.</h2>
+      <h2 className="mt-3 font-mono text-3xl font-extrabold sm:text-4xl">All of that, level with Fastify.</h2>
       <p className="mt-4 max-w-2xl text-soft">
         Requests per second, with plain <code className="font-mono text-ink">node:http</code> as 100. Every server runs at once
         and the measurements take turns, so a slow moment of the machine hits everyone alike.
