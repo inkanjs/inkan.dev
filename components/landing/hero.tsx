@@ -165,13 +165,16 @@ export function Hero() {
           transition={{ delay: 1.4, duration: 0.6, ease }}
           className="mt-8 flex flex-wrap items-center gap-3"
         >
-          <Copy text="npx @vxnsin/inkan learn" />
+          <Copy text="npm i @vxnsin/inkan" />
           <Link
             href="/docs"
             className="rounded-xl bg-seal px-5 py-3 font-mono text-sm font-bold text-[#fbf1e6] shadow-[0_8px_24px_rgba(196,56,31,.35)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(196,56,31,.45)]"
           >
             Read the docs
           </Link>
+          <p className="basis-full font-mono text-xs text-muted">
+            or start from a working project: <span className="text-soft">npx @vxnsin/inkan examples</span>
+          </p>
         </motion.div>
       </div>
 
