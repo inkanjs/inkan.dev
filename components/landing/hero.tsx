@@ -124,14 +124,14 @@ export function Hero() {
         </div>
 
         <motion.a
-          href="https://github.com/inkanjs/inkan/releases/tag/v0.5.0"
+          href="https://github.com/inkanjs/inkan/releases/tag/v0.6.0"
           initial={still ? false : { opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.75, duration: 0.5, ease }}
           className="mb-6 inline-flex max-w-full items-center gap-2 rounded-full border border-line bg-card/60 px-3 py-1 font-mono text-xs text-soft hover:border-hot"
         >
-          <span className="rounded-full bg-seal px-2 py-0.5 font-bold text-[#fbf1e6]">v0.5.0</span>
-          uploads, static files, compression and integrations →
+          <span className="rounded-full bg-seal px-2 py-0.5 font-bold text-[#fbf1e6]">v0.6.0</span>
+          faster, html, cookies and rows as they come →
         </motion.a>
 
         <h1 className="font-mono text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-[3.4rem]">

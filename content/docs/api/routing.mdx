@@ -98,7 +98,7 @@ security: "bearer" // or "basic", { apiKey: "x-key", in: "header" }, a list of t
 The credentials a route asks for. A request without them is a 401 before its input is
 read. Whether they are good is for your hook or handler to say.
 
-## timeout <small>0.6.0</small>
+## timeout
 
 ```ts
 app.get("/report", { timeout: 600_000 }, ({ signal }) => report(signal));
@@ -107,7 +107,7 @@ app.get("/report", { timeout: 600_000 }, ({ signal }) => report(signal));
 Milliseconds the handler may take. Past them the answer is a 504 problem and `ctx.signal`
 is aborted, so a database query behind it can stop. The app's `timeout` is the default.
 
-## cache <small>0.6.0</small>
+## cache
 
 ```ts
 app.get("/stock/:id", { params, cache: { seconds: 600 } }, ({ params }) => stock(params.id));
@@ -143,14 +143,14 @@ For the docs page and OpenAPI; `hidden` keeps a route out of both.
 | --- | --- |
 | an object or an array | JSON, trimmed to the contract |
 | a string | text/plain |
-| `` html`…` `` <small>0.6.0</small> | text/html |
+| `` html`…` `` | text/html |
 | `reply(status, body, headers?)` | another status or extra headers, typed to the contract |
 | `sse(source)` | server-sent events, each one checked against `t.events(...)` |
-| a generator of rows, for an array in the contract <small>0.6.0</small> | JSON written row by row, or NDJSON |
+| a generator of rows, for an array in the contract | JSON written row by row, or NDJSON |
 | bytes, or a stream of bytes | as they are |
 | nothing | 204 |
 
-## Rows, as they come <small>0.6.0</small>
+## Rows, as they come
 
 ```ts
 app.get("/articles", { response: { 200: t.array(Article) } }, async function* ({ signal }) {
