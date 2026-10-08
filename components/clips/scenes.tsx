@@ -74,17 +74,20 @@ export function HooksScene() {
   const steps = ["onRequest", "contract", "preHandler", "handler", "onSend", "onResponse"];
   const gap = 205;
   const x0 = 70;
-  const good = f % 180;
-  const bad = (f + 90) % 180;
-  // the good request walks every step; the bad one stops at the contract and turns back as a 400
   const first = x0 + 75; // the middle of the first box
-  const goodX = interpolate(good, [0, 150], [first - 90, first + gap * 5 + 90], clamp);
-  const badX = bad < 55 ? interpolate(bad, [0, 55], [first - 90, first + gap], clamp) : interpolate(bad, [55, 110], [first + gap, first - 90], clamp);
+  const contract = first + gap;
+  // One pass of 180 frames, the player loops it. The good request comes in, walks every step
+  // and goes out; the bad one starts later, stops at the contract, turns red and goes back.
+  const goodX = interpolate(f, [0, 150], [first - 110, first + gap * 5 + 110], clamp);
+  const goodOn = interpolate(f, [0, 12, 138, 150], [0, 1, 1, 0], clamp);
+  const badX = interpolate(f, [40, 80, 105, 145], [first - 110, contract, contract, first - 110], clamp);
+  const badOn = interpolate(f, [40, 50, 135, 145], [0, 1, 1, 0], clamp);
+  const bounced = f >= 88; // the answer it gets: a 400 problem
   return (
     <AbsoluteFill style={{ background: C.bg, fontFamily: mono, ...noLigatures }}>
       {steps.map((s, i) => {
-        const lit = Math.abs(goodX - (first + i * gap)) < 75;
-        const stopped = bad >= 45 && bad < 75 && i === 1; // the contract, where the bad one bounces
+        const lit = goodOn > 0.5 && Math.abs(goodX - (first + i * gap)) < 75;
+        const stopped = i === 1 && f >= 80 && f < 105; // the contract, holding the bad one back
         return (
           <div key={s} style={{ position: "absolute", left: x0 + i * gap, top: 180, width: 150, height: 90, borderRadius: 16, display: "grid", placeItems: "center", fontSize: 19, fontWeight: 700,
             color: lit || stopped ? "#fbf1e6" : C.soft, background: lit ? C.seal : stopped ? "#8a5a1a" : C.panel, boxShadow: lit ? "0 0 0 6px rgba(196,56,31,.25)" : stopped ? "0 0 0 6px rgba(227,179,65,.25)" : "0 10px 30px rgba(0,0,0,.3)" }}>
@@ -93,9 +96,9 @@ export function HooksScene() {
         );
       })}
       <div style={{ position: "absolute", left: x0, top: 224, width: gap * 5 + 150, height: 2, background: C.bar, zIndex: -1 }} />
-      <div style={{ position: "absolute", left: goodX, top: 120, transform: "translateX(-50%)", whiteSpace: "nowrap", padding: "6px 14px", borderRadius: 999, background: C.ok, color: "#15110f", fontSize: 17, fontWeight: 800 }}>GET /teas/1</div>
-      <div style={{ position: "absolute", left: badX, top: 310, transform: "translateX(-50%)", whiteSpace: "nowrap", padding: "6px 14px", borderRadius: 999, background: bad < 55 ? C.gold : C.hot, color: "#15110f", fontSize: 17, fontWeight: 800 }}>
-        {bad < 55 ? "GET /teas/abc" : "400 · id: expected an integer"}
+      <div style={{ position: "absolute", left: goodX, top: 120, opacity: goodOn, transform: "translateX(-50%)", whiteSpace: "nowrap", padding: "6px 14px", borderRadius: 999, background: C.ok, color: "#15110f", fontSize: 17, fontWeight: 800 }}>GET /teas/1</div>
+      <div style={{ position: "absolute", left: badX, top: 300, opacity: badOn, transform: "translateX(-50%)", whiteSpace: "nowrap", padding: "6px 14px", borderRadius: 999, background: bounced ? C.hot : C.gold, color: "#15110f", fontSize: 17, fontWeight: 800 }}>
+        {bounced ? "400 · id: expected an integer" : "GET /teas/abc"}
       </div>
       <div style={{ position: "absolute", left: x0, top: 420, fontSize: 21, color: C.muted }}>
         hooks reach the routes of their scope; a route with none takes the fast path

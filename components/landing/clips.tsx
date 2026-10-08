@@ -26,12 +26,29 @@ export function Clips() {
   // the Player reads the clock while it renders: only in the browser, never while the page is prerendered
   const mounted = useInBrowser();
 
+  // A clip that plays once stops on its last frame and stays there. Its frames are watched
+  // as well as its end, so it stops even where `ended` comes late or not at all.
+  const once = "once" in clip && clip.once;
   useEffect(() => {
-    if (!player) return;
-    const onEnded = () => setEnded(true);
-    player.addEventListener("ended", onEnded);
-    return () => player.removeEventListener("ended", onEnded);
-  }, [player]);
+    if (!player || !once) return;
+    const last = clip.frames - 1;
+    let stopped = false; // once: pausing fires events of its own
+    const stop = () => {
+      if (stopped) return;
+      stopped = true;
+      player.pause(); // it is on its last frame already
+      setEnded(true);
+    };
+    const onFrame = (e: { detail: { frame: number } }) => {
+      if (e.detail.frame >= last) stop();
+    };
+    player.addEventListener("ended", stop);
+    player.addEventListener("frameupdate", onFrame);
+    return () => {
+      player.removeEventListener("ended", stop);
+      player.removeEventListener("frameupdate", onFrame);
+    };
+  }, [player, once, clip.frames]);
 
   useEffect(() => {
     if (!player) return;

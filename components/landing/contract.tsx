@@ -64,27 +64,30 @@ export function Contract() {
             transition={{ delay: 0.55, duration: 0.45 }}
           />
           {OUT.map((o, i) => (
+            // the arrival is Motion's; the hover is plain CSS on the card alone, so it answers at
+            // once and the tick to the spine stays where it is
             <motion.li
               key={o.title}
+              className="group relative"
               initial={still ? false : { opacity: 0, x: -30, scale: 0.96 }}
               animate={on ? { opacity: 1, x: 0, scale: 1 } : {}}
               transition={{ delay: 0.5 + i * 0.09, type: "spring", stiffness: 200, damping: 22 }}
-              whileHover={{ x: 6, transition: { type: "spring", stiffness: 500, damping: 30 } }}
-              className="relative flex items-center gap-4 rounded-xl border border-line bg-card/80 px-4 py-3 backdrop-blur"
             >
               {/* the tick from the spine to this card */}
               <motion.span
                 aria-hidden
-                className="absolute -left-6 top-1/2 hidden h-0.5 w-6 origin-left bg-seal/70 lg:block"
+                className="absolute -left-6 top-1/2 hidden h-0.5 w-6 origin-left bg-seal/70 transition-[width] duration-150 group-hover:w-7 lg:block"
                 initial={still ? false : { scaleX: 0 }}
                 animate={on ? { scaleX: 1 } : {}}
                 transition={{ delay: 0.75 + i * 0.07, duration: 0.25 }}
               />
-              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-seal/10 font-mono text-sm font-bold text-hot">{o.glyph}</span>
-              <span>
-                <span className="block font-mono text-sm font-bold">{o.title}</span>
-                <span className="block text-sm text-soft">{o.line}</span>
-              </span>
+              <div className="flex items-center gap-4 rounded-xl border border-line bg-card/80 px-4 py-3 backdrop-blur transition duration-150 ease-out group-hover:translate-x-1 group-hover:border-hot/60">
+                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-seal/10 font-mono text-sm font-bold text-hot">{o.glyph}</span>
+                <span>
+                  <span className="block font-mono text-sm font-bold">{o.title}</span>
+                  <span className="block text-sm text-soft">{o.line}</span>
+                </span>
+              </div>
             </motion.li>
           ))}
         </ul>
