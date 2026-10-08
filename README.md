@@ -29,12 +29,14 @@ npm start
 
 The build is a standalone Next.js server in `.next/standalone`, with `public/` and
 `.next/static` copied next to it: the folder is the whole site. `npm start` runs it on `PORT`
-(default 3000) and `HOSTNAME` (default `0.0.0.0`), so under
-[warden](https://github.com/vxnsin/warden) it is:
+(default 3000) and `HOSTNAME` (default `0.0.0.0`):
 
 ```sh
-warden run -- npm start
+PORT=3000 npm start
 ```
+
+Kept running by systemd, pm2 or a container like any Node server, or under
+[warden](https://github.com/vxnsin/warden): `warden run -- npm start`.
 
 Build on the machine it runs on (a Raspberry Pi builds it fine, only slower): the standalone
 folder carries the `node_modules` it needs, for the platform it was built on.
