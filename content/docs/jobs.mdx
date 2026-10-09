@@ -1,0 +1,228 @@
+---
+title: "Jobs"
+description: "Work that takes longer than a request: a queue, progress over SSE, and the result."
+---
+
+Some work does not fit in a request: an export of every order, a report over a million rows,
+a batch of images. A proxy gives up after a minute, the client after less. `app.job` takes
+the work off the request: one route starts it and answers at once, the others tell how it
+goes and hand over what it made.
+
+```ts
+const Progress = t.object({ done: t.int(), total: t.int() });
+const Export = t.object({ url: t.string(), rows: t.int() });
+
+app.job(
+  "/exports",
+  {
+    summary: "Export orders",
+    body: t.object({ from: t.date(), to: t.date() }),
+    progress: Progress,
+    result: Export,
+    concurrency: 2,
+  },
+  async (job) => {
+    const ids = await orderIds(job.input.from, job.input.to);
+    const file = createCsv();
+    for (let i = 0; i < ids.length; i++) {
+      job.signal.throwIfAborted();                       // canceled, timed out, or the server stops
+      await file.write(await loadOrder(ids[i]));
+      job.progress({ done: i + 1, total: ids.length });  // only the latest is kept
+    }
+    return { url: await file.publish(), rows: ids.length };
+  },
+);
+```
+
+The work gets `job.input` (the checked body), `job.signal`, `job.progress(p)`, its `job.id`,
+and `job.ctx`, the context of the request that started it, with its decorations and `state`.
+That request is over, so `job.ctx.signal` throws: use `job.signal`.
+
+## Five routes
+
+`app.job("/exports", …)` defines five ordinary routes. The docs page, OpenAPI, hooks,
+`security`, the typed client and `inkan check` see them like any other.
+
+| route | does | answers |
+| --- | --- | --- |
+| `POST /exports` | starts a job | 202 with the job and a `location`; 503 when the queue is full or the server stops |
+| `GET /exports/:id` | how it stands | 200 with the job; 404 |
+| `GET /exports/:id/events` | follows it as server-sent events | 200, a stream; 404 |
+| `GET /exports/:id/result` | what it made, `?wait=` up to 30 seconds | 200 with the result; 409 while it is not done, or when it failed or was canceled; 404 |
+| `DELETE /exports/:id` | cancels it, or forgets it once it is over | 202 with the job; 204 once forgotten; 404 |
+
+A job, as the routes answer with it:
+
+```json
+{
+  "id": "q3Z0…",
+  "state": "running",
+  "progress": { "done": 120, "total": 4000 },
+  "createdAt": "2026-10-09T09:12:01.000Z",
+  "startedAt": "2026-10-09T09:12:01.004Z"
+}
+```
+
+`state` is `queued`, `running`, `done`, `failed` or `canceled`. A waiting job has a
+`position`, 1 for next. A failed one has an `error`: the problem it threw, or a 500 problem
+for anything else (its message only in development). In OpenAPI the schema is called
+`ExportsJob`, after the path; `name` changes it.
+
+## Following it
+
+`/events` sends the job's `status` first, then its `progress` as it changes, then `end`
+with the job as it ended, and closes. A slow reader gets the latest progress only: nothing
+piles up. The typed client reads it with [`client.events`](/docs/client#events):
+
+```ts
+const started = await shop.post("/exports", { body: { from, to } });
+if (!started.ok) throw new Error(started.problem.title);
+
+for await (const e of shop.events("/exports/:id/events", { params: { id: started.data.id } })) {
+  if (e.event === "progress") bar.set(e.data.done / e.data.total);
+  if (e.event === "end") console.log(e.data.state); // "done", "failed" or "canceled"
+}
+```
+
+In a browser, a plain `EventSource` does the same:
+
+```ts notwoslash
+const events = new EventSource(`/exports/${id}/events`);
+events.addEventListener("progress", (e) => show(JSON.parse(e.data)));
+events.addEventListener("end", () => events.close()); // or it reconnects
+```
+
+And from a shell:
+
+```sh
+curl -X POST localhost:3000/exports -H 'content-type: application/json' \
+  -d '{"from":"2026-01-01","to":"2026-06-30"}'
+curl -N localhost:3000/exports/q3Z0…/events
+```
+
+## The result
+
+```sh
+curl 'localhost:3000/exports/q3Z0…/result?wait=10'
+```
+
+The result as the `result` schema lists it. With `wait`, the request waits up to that many
+seconds (30 at most) for the job to be over, which is often all a script needs instead of a
+stream. A job not done yet is a 409 `job-not-done` with `retry-after`; a failed one a 409
+`job-failed` with its `error`, a canceled one a 409 `job-canceled`. An app-wide `timeout`
+does not cut the wait short.
+
+Finished jobs are kept for `keep` seconds, then forgotten. `DELETE` on a finished job forgets
+it at once (204).
+
+## Canceling
+
+`DELETE /exports/:id` on a waiting job takes it out of the queue. On a running one it aborts
+`job.signal` and answers 202; the job is `canceled` once the work stops. The work has to
+listen: hand `job.signal` to `fetch` or the database driver, or check it in the loop.
+Whatever it returns after the abort is thrown away.
+
+## Whose job it is
+
+Ids are 128 random bits, but anyone with an id could read the result. `owner` ties a job to
+whoever started it, and everybody else gets a 404 for it:
+
+```ts
+app.job("/exports", { body: Range, owner: (ctx) => ctx.headers["x-user-id"] }, run);
+```
+
+Read the owner from what your auth hook made sure of, a session or a verified token, not
+from a header anyone can send. `security` on the job asks for credentials on all five routes.
+
+## On a schedule: every
+
+```ts
+app.job("/reports/nightly", { every: "0 3 * * *", result: Report }, async (job) => buildReport(job.signal));
+
+app.job(
+  "/exports",
+  { body: Range, every: { cron: "0 6 * * mon-fri", input: { from: "2026-01-01", to: "2026-12-31" }, timezone: "local" } },
+  run,
+);
+```
+
+`every` starts the job on a schedule as a POST would: the same queue, concurrency and store,
+without an owner, and the five routes are still there to look at it, follow it or cancel
+it. `job.ctx` of a scheduled run is a context of no real request: a POST to the job's path,
+no headers, its input as the body.
+
+| field | takes |
+| --- | --- |
+| minute | `0-59` |
+| hour | `0-23` |
+| day of month | `1-31` |
+| month | `1-12` or `jan`-`dec` |
+| day of week | `0-7` or `sun`-`sat` (0 and 7 are Sunday) |
+
+Each field takes `*`, a value, a range (`1-5`), a step (`*/15`, `10-50/20`, or `5/15` for
+from 5 to the end) and lists of these (`1,15,30-31`). As in Vixie cron, when both the day of
+month and the day of week are restricted, a day matches either one: `0 0 1 * mon` is the
+first of the month and every Monday. `@yearly`, `@monthly`, `@weekly`, `@daily`,
+`@midnight` and `@hourly` stand for what they say.
+
+- **Time zone.** UTC by default; `timezone: "local"` reads the cron in the process's own zone.
+- **Checked when the job is defined.** A wrong expression, a cron that never matches, another
+  zone, a path with parameters, or an `input` that breaks the `body` (a job with a `body`
+  needs one) stops the start with an error.
+- **No overlap.** A run is skipped while the last one the schedule started still waits or
+  runs.
+- **When it runs.** Schedules start once the app listens (or on `app.started()` for an
+  adapter) and stop on shutdown. Timers are unref'd and set for the next minute each time,
+  so they do not drift; waits past 24.8 days go in hops.
+- **With `workers`** only worker 1 runs the schedules, and a worker that replaces it takes
+  its place: a run starts once, not once per process.
+
+## Options
+
+| option | default | |
+| --- | --- | --- |
+| `body`, `progress`, `result` | | schemas; the progress and the result are trimmed to them, and in development one that breaks its contract fails the job |
+| `concurrency` | `1` | how many run at the same time, in this process |
+| `queue` | `100` | how many may wait; past that, starting one is a 503 `job-queue-full` |
+| `keep` | `3600` | seconds a finished job is kept for its result |
+| `timeout` | none | milliseconds a job may run; past them it fails with a 504 problem and `job.signal` is aborted |
+| `owner` | | `(ctx) => string \| undefined`: whose job it is |
+| `store` | one memory store for the app | where jobs are kept (below) |
+| `every` | | a cron expression, or `{ cron, input, timezone }`: start it on a schedule (above) |
+| `examples` | | examples for starting one; the other four routes get examples built on the first |
+| `summary`, `description`, `tags`, `deprecated`, `hidden`, `security`, `name` | | as for any route; `name` names the job schema |
+
+## Honest limits
+
+- **Jobs run in the process that started them.** One still running when the process ends is
+  lost. There are no retries and nothing is written to disk. Work that must not get lost
+  belongs in a real queue (a database table, Redis, a broker) with a worker of its own.
+- **On SIGINT or SIGTERM** nothing new starts, waiting jobs are canceled, event streams end,
+  and running jobs get a few seconds to finish before their signal is aborted.
+- **With `workers`**, `listen()` refuses jobs kept in memory: a request for a job could land
+  on a process that never heard of it. Run one process, or give `app.job` a store the
+  processes share.
+- **Not on serverless.** A function may be frozen or gone the moment its answer is out. In
+  development inkan warns on Lambda, Vercel and Netlify.
+
+## JobStore
+
+The store only keeps what a job looks like; the work always runs where it was started.
+`memoryStore({ max })` is the one inkan has: at most `max` jobs (1000), the oldest finished
+one goes first. A store several processes share implements this:
+
+```ts notwoslash
+// import type { JobStore, JobRecord } from "@vxnsin/inkan"
+interface JobStore {
+  readonly shared: boolean;                           // true: every process sees the same jobs
+  get(id: string): JobRecord | undefined | Promise<JobRecord | undefined>;
+  set(job: JobRecord): void | Promise<void>;          // keeps it, and tells everyone watching it
+  delete(id: string): void | Promise<void>;
+  sweep(now: number): void | Promise<void>;           // forgets jobs whose expiresAt is now or earlier
+  watch(id: string, fn: (job: JobRecord) => void): () => void;
+  cancel(id: string): void | Promise<void>;           // sets cancelRequested; the process running it stops it
+}
+```
+
+`watch` is what streams, `?wait` and cancel across processes stand on: with Redis it is a
+pub/sub channel per job. A store that fails is reported to `onError`; the job goes on.

@@ -48,3 +48,7 @@ app.get("/teas/:id", { params: t.object({ id: t.int() }) }, (ctx) => ctx.db.find
 A name the context already has is refused, so a decoration cannot hide `params`
 or another decoration. A route with no hooks anywhere above it takes the same
 path it took before there were hooks: they cost nothing until you use them.
+
+For a value made per request (the user of a session, say), `decorateRequest` makes it the
+first time a request reads it. [Writing a plugin](/docs/plugins) has that, typed decorations
+out of shared plugins, route meta, OpenAPI and the order of `onSend` hooks.

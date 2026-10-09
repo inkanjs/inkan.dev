@@ -8,6 +8,7 @@ import { useInBrowser } from "@/lib/client-only";
 
 const LINKS = [
   { href: "/docs", label: "Docs" },
+  { href: "/hanko", label: "Hanko" },
   { href: "/#playground", label: "Playground" },
   { href: "/benchmarks", label: "Benchmarks" },
   { href: "/community", label: "Community" },
@@ -75,7 +76,7 @@ export function Footer() {
         {[
           { title: "Learn", links: [["Docs", "/docs"], ["Installation", "/docs/installation"], ["Routes", "/docs/routes"], ["inkan learn", "/#learn"]] },
           { title: "Packages", links: [["@vxnsin/inkan", "https://www.npmjs.com/package/@vxnsin/inkan"], ["@inkanjs/vite", "/docs/integrations/vite"], ["@inkanjs/next", "/docs/integrations/next"], ["@inkanjs/query", "/docs/integrations/query"]] },
-          { title: "Project", links: [["Benchmarks", "/benchmarks"], ["Community", "/community"], ["GitHub", "https://github.com/inkanjs/inkan"], ["Integrations", "https://github.com/inkanjs/integrations"], ["Changelog", "https://github.com/inkanjs/inkan/blob/main/CHANGELOG.md"], ["This API's docs", "/api/docs"]] },
+          { title: "Project", links: [["Hanko", "/hanko"], ["Benchmarks", "/benchmarks"], ["Community", "/community"], ["GitHub", "https://github.com/inkanjs/inkan"], ["Integrations", "https://github.com/inkanjs/integrations"], ["Changelog", "https://github.com/inkanjs/inkan/blob/main/CHANGELOG.md"], ["This API's docs", "/api/docs"]] },
         ].map((col) => (
           <div key={col.title}>
             <p className="font-mono text-sm font-bold">{col.title}</p>

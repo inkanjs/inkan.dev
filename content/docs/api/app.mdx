@@ -70,6 +70,9 @@ Hooks run for the routes of their scope, in this order:
 
 A route with no hooks anywhere above it takes the fast path, with no hook machinery at all.
 
+`onSend(fn, { last: true })` runs a hook after every other `onSend` hook of the route,
+outermost scope first: for a hook that changes the body's bytes, as `compress` does.
+
 ## register()
 
 ```ts
@@ -89,7 +92,9 @@ A plugin gets a scope of its own: its hooks, decorations and layout reach the ro
 inside it and nothing outside. Made with `plugin(fn, { shared: true })`, it acts on the
 scope it is registered in instead, which is right for a plugin like a rate limit.
 Plugins run in the order they are registered; one that returns a promise holds back the
-ones after it, and `listen()` waits for all of them.
+ones after it, and `listen()` waits for all of them. A shared plugin that returns its scope
+hands on the types of its decorations: `register()` returns the app typed with them. See
+[Writing a plugin](/docs/plugins).
 
 ## decorate()
 
@@ -100,6 +105,84 @@ app.get("/teas", ({ db }) => db.teas.all()); // typed
 
 Puts a value on every context of the scope, once, on the context's prototype: it costs
 nothing per request. A name the context already has is refused.
+
+## decorateRequest()
+
+```ts
+app.decorateRequest("user", (ctx) => sessions.get(ctx.cookies.sid));
+app.get("/me", ({ user }) => user); // typed
+```
+
+A value made anew for each request. The function runs the first time a request reads
+`ctx.user`, and the value is kept for the rest of that request; a request that never reads
+it never makes it. Names are refused as with `decorate`. An `init` that returns a promise,
+with `{ before: "handler", when }`, is awaited before the handler: see
+[async decorations](/docs/plugins#async-decorations). New in 0.7.0.
+
+## job()
+
+```ts
+app.job("/exports", { body: Range, progress: Progress, result: Export }, async (job) => {
+  job.progress({ done: 1, total: 2 });
+  return { url: "/x.csv", rows: 2 };
+});
+```
+
+Work that takes longer than a request, as five routes around a queue: start it, look at it,
+follow it as server-sent events, wait for its result, cancel it. Jobs run in this process.
+[Jobs](/docs/jobs) has the routes, the options and the limits. `every` starts one on a cron
+schedule. New in 0.7.0.
+
+## ws()
+
+```ts
+app.ws("/rooms/:room", { params: t.object({ room: t.string() }), message: Say, send: Said }, (socket, ctx) => {
+  socket.on("message", (m) => {
+    if (m.type === "say") void socket.send({ type: "said", text: m.text, from: ctx.params.room });
+  });
+});
+```
+
+A WebSocket route: the upgrade goes through the hooks, the security and the input checks
+like a GET, then the socket speaks JSON by the `message` and `send` contracts.
+[WebSockets](/docs/websocket) has the socket, the origins, the options and the close codes.
+New in 0.7.0.
+
+## describe()
+
+```ts
+app.describe((op, route, components, ref) => {
+  if (route.security.length) op.responses["403"] ??= { description: "Not allowed for these credentials" };
+  if (route.spec.tags?.includes("billing")) {
+    op.responses["402"] ??= { description: "Pay first", content: { "application/json": { schema: ref(Invoice, "Invoice") } } };
+  }
+});
+```
+
+Adds to the OpenAPI operation of every route in the scope: header parameters, answers,
+descriptions, details of a security scheme. It runs when the document is written, never
+per request, outer scopes first. New in 0.7.0.
+
+| argument | |
+| --- | --- |
+| `op` | the OpenAPI operation, to change |
+| `route` | an `OperationRoute`: the frozen [`ctx.route`](/docs/api/context#route) view (`method`, `path`, `security`, `meta`) plus the `spec` the route was written with. Read-only |
+| `components` | the document's components; `securitySchemes` holds the schemes the routes ask for |
+| `ref(schema, name?)` | lists a `t.*` schema once under `components.schemas` and returns `{ $ref }` to it. An unnamed schema needs `name` |
+
+## dev, prefix
+
+```ts
+const audit = plugin((scope) => {
+  if (scope.dev) scope.get("/_audit", () => recent());
+  logger.info(`audit under ${scope.prefix || "/"}`);
+});
+```
+
+Read-only. `dev` is whether the app runs in development (the `dev` option, by default
+`NODE_ENV` is not `"production"`), on the app and on every scope; set it with the option.
+`prefix` is the path prefix of the scope: `""` for the app, `"/v1"` for a plugin registered
+with `{ prefix: "/v1" }`. New in 0.7.0.
 
 ## layout()
 
@@ -219,6 +302,10 @@ Runs every route's examples against the app, as `inkan check` does from the comm
 | `requestId` | `"x-request-id"` | the header for the request id, or `false` |
 | `gracefulShutdown` | `true` | lets open requests finish on SIGINT and SIGTERM |
 | `workers` | one process | `"auto"` or a number: a process per core, one port |
+| `trustProxy` | off | believe the proxies in front about the client: `true` for every one, a number of hops, or `(ip) => boolean` for the addresses that are yours. `ctx.ip`, and with it `rateLimit`, then reads `x-forwarded-for` or `forwarded`. New in 0.7.0 |
+| `wsOrigins` | the own origin | the pages that may open the app's WebSockets, for every route without `origins` of its own; see [WebSockets](/docs/websocket#who-may-open-it-origins). New in 0.7.0 |
+| `pressure` | off | overload protection: a 503 `under-pressure` while the event loop lags or memory runs high; `app.pressure()` hands back the last sample. See [Running in production](/docs/runtime#pressure-overload-protection). New in 0.7.0 |
+| `context` | `false` | answer each request inside an AsyncLocalStorage, for [`context()`](/docs/runtime#context-the-request-anywhere). New in 0.7.0 |
 | `dev` | `NODE_ENV !== "production"` | development mode |
 | `onError` | `console.error` | sees every error that becomes a 500 |
 | `seal` | | the contracts `inkan seal` stamped into code |

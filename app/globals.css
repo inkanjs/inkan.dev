@@ -129,6 +129,7 @@ pre,
 [data-tone="clips"] { --tone: #e8dcc8; }
 [data-tone="bench"] { --tone: #f5e4d8; }
 [data-tone="integrations"] { --tone: #f2e9da; }
+[data-tone="hanko"] { --tone: #f6e6dc; }
 [data-tone="learn"] { --tone: #ede2cf; }
 /* dark: the clips play in the darkest room, the numbers glow a little red */
 .dark[data-tone="contract"] { --tone: #1e1815; }
@@ -136,6 +137,7 @@ pre,
 .dark[data-tone="clips"] { --tone: #100c0b; }
 .dark[data-tone="bench"] { --tone: #24150f; }
 .dark[data-tone="integrations"] { --tone: #1b1715; }
+.dark[data-tone="hanko"] { --tone: #21130f; }
 .dark[data-tone="learn"] { --tone: #14100e; }
 
 /* Lenis scrolls the page itself; the browser's own smoothing would fight it */

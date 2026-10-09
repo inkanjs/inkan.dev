@@ -133,6 +133,16 @@ app.get("/teas", { use: [audit] }, list);
 
 Middleware for this route only, after its input was checked.
 
+## meta
+
+```ts
+app.get("/reports", { meta: { auth: { roles: ["admin"] } } }, list);
+```
+
+Free-form facts about the route for plugins to read in their hooks, as `ctx.route.meta`. It
+is not in OpenAPI. A plugin types what it reads by extending `RouteMeta`; see
+[Writing a plugin](/docs/plugins#ctxroute-security-and-meta). New in 0.7.0.
+
 ## summary, description, tags, operationId, deprecated, hidden
 
 For the docs page and OpenAPI; `hidden` keeps a route out of both.

@@ -93,3 +93,27 @@ with the plugins, and `listen` waits for it. In a plugin the routes go under its
 prefix. They are routes like any other, with the same contracts, in OpenAPI and
 in `inkan check`. Files starting with `_`, `.d.ts` and test files are left alone,
 so helpers can live next to the routes.
+
+## More middleware
+
+Next to the [built-in](/docs/built-in/cors) ones, packages under `@inkanjs` add what not
+every app needs. They come with inkan 0.7.0:
+
+| package | does |
+| --- | --- |
+| [`@inkanjs/auth`](/docs/official/auth) | sessions, JWTs, API keys and basic auth, roles, CSRF, 2FA, OAuth and refresh tokens, on `ctx.user` |
+| [`@inkanjs/session`](/docs/official/session) | cookie sessions, signed, encrypted or in a store, typed on `ctx.session` |
+| [`@inkanjs/secure-headers`](/docs/official/secure-headers) | a strict Content-Security-Policy with nonces, HSTS and the rest |
+| [`@inkanjs/etag`](/docs/official/etag) | ETags and `304 Not Modified`, hashed before compression |
+| [`@inkanjs/idempotency`](/docs/official/idempotency) | `Idempotency-Key`: a POST sent twice runs once |
+| [`@inkanjs/proxy`](/docs/official/proxy) | a prefix or a route handed on to a server behind it, streamed both ways |
+| [`@inkanjs/circuit-breaker`](/docs/official/circuit-breaker) | stop calling what keeps failing: around a call, or a circuit per route |
+| [`@inkanjs/otel`](/docs/official/otel) | OpenTelemetry: a `SERVER` span per request, named by its route |
+
+Most are shared plugins: `app.register(auth({ … }))`. `proxy()` brings routes of its own,
+and `circuit()` wraps a function. Each names the inkan versions it works with,
+`inkan: ">=0.7.0 <0.8.0"`, the same range as its peer dependency, so `register()` throws on
+an app outside it instead of half-working. To write one of your own, see
+[Writing a plugin](/docs/plugins).
+
+Built-in, official and community: see everything on [Hanko](/hanko).

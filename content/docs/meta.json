@@ -15,13 +15,22 @@
     "---Guides---",
     "schemas",
     "streams",
+    "websocket",
+    "jobs",
+    "runtime",
     "client",
     "middleware",
     "hooks",
+    "plugins",
+    "publish-a-plugin",
     "cli",
     "---Middleware---",
     "...built-in",
+    "---More middleware---",
+    "...official",
     "---Integrations---",
-    "...integrations"
+    "...integrations",
+    "---Recipes---",
+    "...recipes"
   ]
 }

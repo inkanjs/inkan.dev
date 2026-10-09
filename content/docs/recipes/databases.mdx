@@ -1,0 +1,103 @@
+---
+title: "Databases"
+description: "Postgres, Redis, MongoDB and Prisma: connect at start, decorate, close on shutdown."
+---
+
+inkan has no database layer and needs none. The pattern is the same for every driver: make
+the client once, hand it to every handler with [`decorate`](/docs/api/app#decorate), check
+the connection in [`onListen`](/docs/api/app#onlisten-onclose) so a bad URL stops the start,
+and close it in `onClose`, after the last request. These are recipes, not packages: a few
+lines on the driver you already use.
+
+Chain `decorate` on the app: the handlers after it see `ctx.db` typed as the client.
+
+## Postgres (pg)
+
+```ts notwoslash
+import { inkan, t } from "@vxnsin/inkan";
+import pg from "pg";
+
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+type Tea = { id: number; name: string };
+
+export const app = inkan()
+  .decorate("db", pool)
+  .onListen(async () => void (await pool.query("select 1"))) // a bad URL stops the start
+  .onClose(() => pool.end())
+  .get("/teas/:id", { params: t.object({ id: t.int() }) }, async ({ params, db }) => {
+    const { rows } = await db.query<Tea>("select id, name from teas where id = $1", [params.id]);
+    return rows[0] ?? null;
+  });
+```
+
+A transaction takes one client of the pool for the whole request: `const c = await db.connect()`,
+then `begin`, your queries, `commit` (or `rollback` in a `catch`), and `c.release()` in a `finally`.
+
+## Redis (ioredis)
+
+```ts notwoslash
+import { inkan, t } from "@vxnsin/inkan";
+import { Redis } from "ioredis";
+
+const redis = new Redis(process.env.REDIS_URL!, { lazyConnect: true });
+
+export const app = inkan()
+  .decorate("redis", redis)
+  .onListen(() => redis.connect())
+  .onClose(() => redis.quit().then(() => {}))
+  .post("/teas/:id/views", { params: t.object({ id: t.int() }) }, async ({ params, redis }) => ({
+    views: await redis.incr(`tea:${params.id}:views`),
+  }));
+```
+
+Commands that must run together go in `redis.multi()…exec()`: queued, then sent as one.
+
+## MongoDB
+
+```ts notwoslash
+import { inkan, t } from "@vxnsin/inkan";
+import { MongoClient } from "mongodb";
+
+type Tea = { id: number; name: string };
+const mongo = new MongoClient(process.env.MONGO_URL!);
+
+export const app = inkan()
+  .decorate("db", mongo.db("shop"))
+  .onListen(() => mongo.connect().then(() => {}))
+  .onClose(() => mongo.close())
+  .get("/teas/:id", { params: t.object({ id: t.int() }) }, ({ params, db }) =>
+    db.collection<Tea>("teas").findOne({ id: params.id }, { projection: { _id: 0 } }),
+  );
+```
+
+The projection keeps `_id` out; the contract would drop it anyway, but there is no reason to
+read it. Transactions need a replica set: `await mongo.withSession((s) => s.withTransaction(async () => { … }))`,
+passing `{ session: s }` to every call inside.
+
+## Prisma
+
+```ts notwoslash
+import { inkan, t } from "@vxnsin/inkan";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "./generated/prisma/client";
+
+const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
+
+export const app = inkan()
+  .decorate("db", prisma)
+  .onListen(() => prisma.$connect())
+  .onClose(() => prisma.$disconnect())
+  .get("/teas/:id", { params: t.object({ id: t.int() }) }, ({ params, db }) =>
+    db.tea.findUnique({ where: { id: params.id }, select: { id: true, name: true } }),
+  );
+```
+
+That is Prisma 7, with its generated client and a driver adapter. On Prisma 6, import
+`PrismaClient` from `@prisma/client` and leave the adapter out. Work that must succeed or fail
+as one goes in `db.$transaction(async (tx) => { … })`, using `tx` instead of `db` inside.
+
+## Serverless and workers
+
+On serverless there is no `listen()`, so `onListen` and `onClose` do not run: make the client
+at the top of the module, as above, and let the platform keep it between requests. With
+[workers](/docs/deploy), each process makes its own pool; size it for all of them together.
