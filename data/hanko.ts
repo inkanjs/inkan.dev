@@ -1,8 +1,9 @@
 // What /hanko lists: everything that stamps onto an inkan app.
-// To list a plugin of your own, add an entry under "community" and open a pull request.
-// See /docs/publish-a-plugin for what makes it in.
+// Community packages with the npm keyword inkan-plugin are listed by themselves (lib/hanko.ts).
+// An entry here is for a better line, tags or a docs link: add it under "community" in a pull request.
+// See /docs/publish-a-plugin.
 
-export type HankoKind = "built-in" | "middleware" | "integration" | "community";
+export type HankoKind = "built-in" | "middleware" | "integration" | "recipe" | "community";
 
 export type Hanko = {
   /** the package name, or what you write in code for a built-in */
@@ -20,12 +21,21 @@ export type Hanko = {
   code?: string;
   /** the inkan version it needs, while that version is still on its way */
   since?: string;
+  /* filled from npm for the packages found there, never written by hand */
+  version?: string;
+  /** the last publish, as a date to show */
+  published?: string;
+  /** downloads last week */
+  weekly?: number;
+  /** runtime dependencies, when npm says */
+  deps?: number;
 };
 
 export const KINDS: { kind: HankoKind; label: string; note: string }[] = [
   { kind: "built-in", label: "built-in", note: "In the core. Nothing to install, nothing to keep in step." },
   { kind: "middleware", label: "middleware", note: "Official packages under @inkanjs, each a shared plugin." },
   { kind: "integration", label: "integrations", note: "inkan where you already are. One package each." },
+  { kind: "recipe", label: "recipes", note: "Not packages: a few lines of your own, on the driver you already use." },
   { kind: "community", label: "community", note: "Written by others, listed here, maintained by their authors." },
 ];
 
@@ -255,6 +265,40 @@ export const hanko: Hanko[] = [
     tags: ["uwebsockets", "performance", "server", "runtime"],
   },
 
+  /* ---------- recipes: no package, a page of the docs ---------- */
+  {
+    name: "postgres",
+    description: "A pg Pool on ctx.db: checked at start, closed after the last request, a transaction per request when you need one.",
+    kind: "recipe",
+    href: "/docs/recipes/databases#postgres-pg",
+    code: `app.decorate("db", new pg.Pool())`,
+    tags: ["database", "sql", "pg", "postgresql"],
+  },
+  {
+    name: "redis",
+    description: "ioredis on ctx.redis: connected in onListen, quit in onClose, multi() for commands that belong together.",
+    kind: "recipe",
+    href: "/docs/recipes/databases#redis-ioredis",
+    code: `app.decorate("redis", new Redis(url))`,
+    tags: ["database", "cache", "ioredis", "key-value"],
+  },
+  {
+    name: "mongodb",
+    description: "The official driver's Db on ctx.db, typed collections, and transactions on a replica set.",
+    kind: "recipe",
+    href: "/docs/recipes/databases#mongodb",
+    code: `app.decorate("db", mongo.db("shop"))`,
+    tags: ["database", "nosql", "mongo", "documents"],
+  },
+  {
+    name: "prisma",
+    description: "A Prisma client on ctx.db, typed from the schema, with $transaction for work that succeeds or fails as one.",
+    kind: "recipe",
+    href: "/docs/recipes/databases#prisma",
+    code: `app.decorate("db", new PrismaClient())`,
+    tags: ["database", "orm", "sql", "postgresql"],
+  },
+
   /* ---------- community ----------
      {
        name: "inkan-<name>",
@@ -267,3 +311,6 @@ export const hanko: Hanko[] = [
      },
   */
 ];
+
+/** npm packages with the keyword that are kept off the page: misuse of the keyword, or gone stale */
+export const hidden: string[] = [];

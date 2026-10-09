@@ -4,17 +4,39 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { hanko, KINDS, type Hanko, type HankoKind } from "@/data/hanko";
+import { KINDS, type Hanko, type HankoKind } from "@/data/hanko";
 
 type Pick = "all" | HankoKind;
 
 const haystack = (h: Hanko) => [h.name, h.npm, h.description, h.kind, ...(h.tags ?? [])].join(" ").toLowerCase();
-const INDEX = hanko.map((h) => ({ h, text: haystack(h) }));
 
-function matches(query: string) {
+function matches(index: { h: Hanko; text: string }[], query: string) {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return hanko;
-  return INDEX.filter(({ text }) => words.every((w) => text.includes(w))).map(({ h }) => h);
+  if (words.length === 0) return index.map(({ h }) => h);
+  return index.filter(({ text }) => words.every((w) => text.includes(w))).map(({ h }) => h);
+}
+
+const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
+
+/** what npm says about a package: version, last publish, downloads, dependencies */
+function Facts({ h }: { h: Hanko }) {
+  const facts = [
+    h.version && `v${h.version}`,
+    h.published,
+    typeof h.weekly === "number" && `${compact.format(h.weekly)} a week`,
+    typeof h.deps === "number" && (h.deps === 0 ? "no deps" : `${h.deps} dep${h.deps === 1 ? "" : "s"}`),
+  ].filter(Boolean) as string[];
+  if (facts.length === 0) return null;
+  return (
+    <p className="mt-3 flex flex-wrap gap-x-2 font-mono text-[11px] text-muted">
+      {facts.map((f, i) => (
+        <span key={f}>
+          {i > 0 && <span aria-hidden className="mr-2 text-line">·</span>}
+          {f}
+        </span>
+      ))}
+    </p>
+  );
 }
 
 /** typing into a field: `/` belongs to it then */
@@ -29,6 +51,7 @@ function Kind({ kind }: { kind: HankoKind }) {
     "built-in": "border-seal bg-seal text-[#fbf1e6]",
     middleware: "border-hot/60 text-hot",
     integration: "border-soft/50 text-soft",
+    recipe: "border-dotted border-soft/60 text-soft",
     community: "border-dashed border-muted text-muted",
   }[kind];
   return (
@@ -99,8 +122,9 @@ function Card({ h, still }: { h: Hanko; still: boolean | null }) {
         <Kind kind={h.kind} />
       </div>
       <p className="mt-2 text-sm leading-relaxed text-soft">{h.description}</p>
+      <Facts h={h} />
       <div className="mt-auto pt-5">
-        {h.npm ? <Copy text={`npm i ${h.npm}`} prompt /> : h.code ? <Copy text={h.code} /> : <p className="py-1.5 font-mono text-xs text-muted">in the core · nothing to import</p>}
+        {h.npm ? <Copy text={`npm i ${h.npm}`} prompt /> : h.code ? <Copy text={h.code} /> : <p className="py-1.5 font-mono text-xs text-muted">{h.kind === "built-in" ? "in the core · nothing to import" : "a recipe · no package"}</p>}
         <div className="mt-3 flex items-center gap-3 font-mono text-xs">
           <span className="text-hot transition group-hover:translate-x-0.5">{more} →</span>
           {h.since && <span className="text-muted">needs {h.since}</span>}
@@ -133,8 +157,8 @@ function FirstStamp({ still }: { still: boolean | null }) {
       <div>
         <p className="font-mono text-lg font-bold">Be the first stamp here.</p>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-soft">
-          No community plugins yet. Publish yours as <code className="whitespace-nowrap font-mono text-ink">inkan-&lt;name&gt;</code>, add one entry to the
-          list in a pull request, and it shows up here next to the official ones.
+          No community plugins yet. Publish yours as <code className="whitespace-nowrap font-mono text-ink">inkan-&lt;name&gt;</code> with the npm keyword{" "}
+          <code className="font-mono text-ink">inkan-plugin</code>, and it shows up here next to the official ones within a day.
         </p>
         <Link href="/docs/publish-a-plugin" className="mt-4 inline-block font-mono text-sm text-hot underline-offset-4 hover:underline">
           publish a plugin →
@@ -146,7 +170,7 @@ function FirstStamp({ still }: { still: boolean | null }) {
 
 /* ---------- the catalog ---------- */
 
-export function Catalog() {
+export function Catalog({ entries }: { entries: Hanko[] }) {
   const [query, setQuery] = useState("");
   const [pick, setPick] = useState<Pick>("all");
   const field = useRef<HTMLInputElement>(null);
@@ -163,7 +187,8 @@ export function Catalog() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const found = useMemo(() => matches(query), [query]);
+  const index = useMemo(() => entries.map((h) => ({ h, text: haystack(h) })), [entries]);
+  const found = useMemo(() => matches(index, query), [index, query]);
   const count = (k: Pick) => (k === "all" ? found.length : found.filter((h) => h.kind === k).length);
   const groups = KINDS.filter((g) => pick === "all" || g.kind === pick)
     .map((g) => ({ ...g, items: found.filter((h) => h.kind === g.kind) }))
@@ -227,7 +252,7 @@ export function Catalog() {
       </div>
 
       <p className="mt-4 font-mono text-xs text-muted" aria-live="polite">
-        {query.trim() ? `${shown} of ${hanko.length} match “${query.trim()}”` : `${shown} of ${hanko.length}`}
+        {query.trim() ? `${shown} of ${entries.length} match “${query.trim()}”` : `${shown} of ${entries.length}`}
         <span className="hidden sm:inline"> · press / to search, esc to clear</span>
       </p>
 

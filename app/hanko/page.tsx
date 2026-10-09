@@ -4,24 +4,25 @@ import { Code } from "@/components/code";
 import { Catalog } from "@/components/hanko/catalog";
 import { Footer, Nav } from "@/components/landing/chrome";
 import { Smooth } from "@/components/landing/smooth";
+import { allHanko } from "@/lib/hanko";
 
 export const metadata: Metadata = {
   title: "Hanko",
-  description: "Everything that stamps onto inkan: what is in the core, the official middleware, the integrations and community plugins.",
+  description: "Everything that stamps onto inkan: what is in the core, the official middleware, the integrations, recipes and community plugins.",
 };
 
-const ENTRY = `// data/hanko.ts, in inkanjs/inkan.dev
+const PACKAGE = `// package.json
 {
-  name: "inkan-tenant",
-  description: "One line: what it does.",
-  kind: "community",
-  href: "https://github.com/you/inkan-tenant#readme",
-  npm: "inkan-tenant",
-  repo: "https://github.com/you/inkan-tenant",
-  tags: ["multi-tenant", "headers"],
+  "name": "inkan-tenant",
+  "description": "One line: what it does.",
+  "keywords": ["inkan", "inkan-plugin"],
+  "peerDependencies": {
+    "@vxnsin/inkan": ">=0.7.0"
+  }
 }`;
 
-export default function HankoPage() {
+export default async function HankoPage() {
+  const entries = await allHanko(); // the static list, and what npm adds: asked once a day
   return (
     <div className="paper grain flex min-h-screen flex-col">
       <Smooth />
@@ -36,8 +37,8 @@ export default function HankoPage() {
             </span>
           </h1>
           <p className="mt-5 max-w-2xl text-lg text-soft">
-            Everything that stamps onto an inkan app: what comes in the core, the official middleware, the integrations, and
-            the plugins other people publish.
+            Everything that stamps onto an inkan app: what comes in the core, the official middleware, the integrations, a few
+            recipes, and the plugins other people publish.
           </p>
           <p className="mt-3 max-w-2xl text-sm text-muted">
             The <em>inkan</em> is the seal. A <em>hanko</em> is the everyday word for the stamp you press it with.
@@ -45,7 +46,7 @@ export default function HankoPage() {
         </section>
 
         <section className="pb-12">
-          <Catalog />
+          <Catalog entries={entries} />
         </section>
 
         <section className="grid gap-10 py-16 lg:grid-cols-2 lg:items-center">
@@ -54,11 +55,13 @@ export default function HankoPage() {
             <p className="mt-4 text-soft">
               A plugin is a function that gets a scope and its options. Publish it on npm as{" "}
               <code className="whitespace-nowrap font-mono text-ink">inkan-&lt;name&gt;</code> with the keyword{" "}
-              <code className="font-mono text-ink">inkan-plugin</code>, then add one entry to this list in a pull request.
+              <code className="font-mono text-ink">inkan-plugin</code>, and it is on this page within a day. No form, no
+              pull request.
             </p>
             <p className="mt-4 text-soft">
-              Community entries are looked over before they are listed, not maintained by inkan: the README, the issues and
-              the releases stay with their authors.
+              Community packages are listed as npm has them, not reviewed or maintained by inkan: the README, the issues
+              and the releases stay with their authors. A pull request to the list is only for a better line, tags or a
+              link to docs.
             </p>
             <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 font-mono text-sm">
               <Link href="/docs/plugins" className="text-hot underline underline-offset-4">
@@ -69,7 +72,7 @@ export default function HankoPage() {
               </Link>
             </div>
           </div>
-          <Code title="one entry, one pull request" code={ENTRY} className="min-w-0" />
+          <Code title="the keyword is enough" code={PACKAGE} className="min-w-0" />
         </section>
       </main>
       <Footer />
