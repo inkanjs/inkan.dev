@@ -51,7 +51,9 @@ report points at the right line.
 ```
 
 The client's address, as the socket or the platform says it. Behind a proxy that is the
-proxy; read its `x-forwarded-for` yourself when you trust it.
+proxy, unless the app says [`trustProxy`](/docs/api/app#options): then it is the client's
+address from `x-forwarded-for` or `forwarded`, believed only as far as the proxies you
+named.
 
 ## cookies
 
@@ -89,7 +91,9 @@ every request, a [decoration](/docs/api/app#decorate) is cheaper.
 ({ route }) => metrics.count(route?.path) // "/teas/:id", not "/teas/7"
 ```
 
-The route that matched, as it was written.
+The route that matched, as it was written: its `method`, its `path`, the `security` it asks
+for (its own or its group's, empty for none) and its [`meta`](/docs/api/routing#meta). One
+object per route, made before the first request, so hooks can read it for free.
 
 ## req, res
 

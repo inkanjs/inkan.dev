@@ -1,0 +1,165 @@
+---
+title: "Writing a plugin"
+description: "Shared and scoped plugins, decorations, route meta, OpenAPI and hook order."
+---
+
+A plugin is a function that gets a scope and its options. Everything a plugin can do is the
+API of the app: routes, hooks, decorations, `describe`. This page is about what matters when
+the plugin is for other people. The [hooks](/docs/hooks) page has the basics.
+
+<Callout title="Coming with 0.7.0">
+  `decorateRequest`, typed decorations out of shared plugins, `ctx.route.security` and
+  `meta`, `describe()`, `onSend(fn, { last: true })` and `trustProxy` are new in inkan 0.7.0.
+</Callout>
+
+## Shared or scoped
+
+```ts
+import { plugin } from "@vxnsin/inkan";
+
+const admin = plugin((app) => {                       // scoped: a scope of its own
+  app.onRequest(requireAdmin);
+  app.get("/stats", () => stats());
+});
+
+const poweredBy = plugin((app) => {                    // shared: acts on the scope around it
+  app.onSend((ctx, answer) => void (answer.headers["x-powered-by"] = "tea"));
+}, { shared: true, name: "powered-by" });
+
+app.register(admin, { prefix: "/admin" });
+app.register(poweredBy);
+```
+
+A **scoped** plugin gets a scope inside the one it is registered in. Its hooks and
+decorations reach its own routes and nothing outside. Right for a plugin that brings
+routes: an admin area, a webhook receiver.
+
+A **shared** plugin works in the scope it is registered in. Registered on the app, its hooks
+run for every route; registered inside another plugin, for that plugin's routes. Right for
+a plugin whose point is to act on the routes around it: a rate limit, sessions, headers.
+`rateLimit`, `compress` and every package under [More middleware](/docs/official/session)
+are shared.
+
+## decorate or decorateRequest
+
+```ts
+app.decorate("db", pool);                                          // one value, for every request
+app.decorateRequest("user", (ctx) => sessions.get(ctx.cookies.sid)); // made per request
+```
+
+`decorate` puts one value on the context's prototype: it costs nothing per request. Use it
+for things every request shares: a pool, a client, a config.
+
+`decorateRequest` puts a getter there instead. `init` runs the first time a request reads
+`ctx.user`, and the value is kept on that context, so it runs at most once per request, and
+never for a request that does not ask. Hooks see it too, and setting `ctx.user = …` in a hook
+wins over `init`. `init` can read other decorations. Both refuse a name the context already
+has, so a plugin cannot hide `ctx.params` or another plugin's decoration.
+
+## Typed decorations out of shared plugins
+
+A shared plugin that returns its scope hands on the types of what it decorated. After
+`register`, the handlers see them:
+
+```ts
+type User = { id: number; roles: string[] };
+
+const auth = plugin(
+  (app, o: { header: string }) =>
+    app.decorateRequest("user", (ctx): User | undefined => {
+      const id = ctx.headers[o.header];
+      return id ? { id: Number(id), roles: ["admin"] } : undefined;
+    }),
+  { shared: true, name: "auth" },
+);
+
+inkan()
+  .register(auth, { header: "x-user" })
+  .get("/me", (ctx) => ({ id: ctx.user?.id ?? null })); // ctx.user: User | undefined
+```
+
+Type the options on the parameter (`o: { header: string }`), not as a type argument, or
+there is nothing left to infer from. An async plugin works the same: return the scope at
+the end. A scoped plugin keeps its decorations to itself, in the types too.
+
+For a plugin written in JavaScript, or one that does not return its scope, say what it adds
+in the type: `Plugin<Options, Needs, Adds>`.
+
+```ts
+import type { Plugin } from "@vxnsin/inkan";
+
+export declare function session(options: { secret: string }): Plugin<{}, {}, { session: Session }>;
+```
+
+## ctx.route: security and meta
+
+Every hook sees the route that matched as `ctx.route`: its `method`, its `path` as written
+(`/teas/:id`), the `security` it asks for (its own or its group's; empty for none), and its
+`meta`. The object is made once per route, before the first request.
+
+`meta` is free-form, for plugins to read:
+
+```ts
+app.get("/reports", { security: "bearer", meta: { auth: { roles: ["admin"] } } }, list);
+
+app.onRequest((ctx) => {
+  const roles = ctx.route?.meta.auth?.roles ?? [];
+  if (roles.length && !roles.some((r) => ctx.user?.roles.includes(r))) throw problem(403, "forbidden");
+});
+```
+
+A plugin names what it reads by extending the exported `RouteMeta` interface. Then a wrong
+shape does not compile, and the editor suggests the field:
+
+```ts
+declare module "@vxnsin/inkan" {
+  interface RouteMeta {
+    auth?: { roles: string[] };
+  }
+}
+```
+
+## describe(): adding to OpenAPI
+
+A plugin that adds a header or an answer should say so in the document. `describe` runs for
+every route of its scope when the document is written, never per request:
+
+```ts
+app.describe((op, route, components) => {
+  if (!route.security?.includes("bearer")) return;
+  components.securitySchemes!.bearer!.bearerFormat = "JWT";
+  op.responses["403"] ??= { description: "The token does not allow this" };
+  (op.parameters ??= []).push({ name: "x-tenant", in: "header", required: false, schema: { type: "string" } });
+});
+```
+
+`op` is the OpenAPI operation, `route` the route as inkan keeps it, `components` the
+document's components: `securitySchemes` already holds the schemes the routes ask for, and
+new sections (`responses`, `parameters`) are kept. Outer scopes' hooks run first. A hook
+added after the document was written still reaches it: it is written again.
+
+## onSend order and `last`
+
+`onSend` hooks run outermost scope first, in the order they were added. A hook that changes
+the bytes of the body should come after all of them, and `{ last: true }` says so:
+
+```ts
+app.onSend((ctx, answer) => sign(answer), { last: true });
+```
+
+Last hooks run after every other `onSend` hook of the route, again outermost first.
+`compress` is one, so a hook that reads the body (an [ETag](/docs/official/etag), a
+signature) sees it before it is packed, wherever either was registered.
+
+## Behind a proxy
+
+`ctx.ip` is the socket's address unless the app trusts its proxies. A plugin that keys on
+the client, like `rateLimit`, reads `ctx.ip` and gets the right one once the app says
+`trustProxy` (see [App options](/docs/api/app#options)). Do not read `x-forwarded-for`
+yourself: anyone can send it.
+
+## Cookies outside a context
+
+`parseCookies(header)` and `serializeCookie(name, value, options)` are exported for plugins
+that read or write cookies on their own, with the same defaults as `ctx.setCookie`
+(`Path=/`, `HttpOnly`, `SameSite=Lax`).
