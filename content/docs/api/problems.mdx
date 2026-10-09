@@ -35,7 +35,9 @@ problem(status, type, detail?, extra?)
 ```
 
 Makes one. Thrown anywhere on the way, in a handler, a hook or a middleware, it becomes the
-answer. `extra` adds fields of your own. Headers go on `p.headers`:
+answer. Returned instead of thrown, it is answered the same way, with its own status and
+shape (before 0.7.0 a returned problem went out as a 200). `extra` adds fields of your own.
+Headers go on `p.headers`:
 
 ```ts
 const p = problem(429, "slow-down", "Try again in a minute");

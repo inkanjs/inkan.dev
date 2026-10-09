@@ -7,10 +7,11 @@ A plugin is a function that gets a scope and its options. Everything a plugin ca
 API of the app: routes, hooks, decorations, `describe`. This page is about what matters when
 the plugin is for other people. The [hooks](/docs/hooks) page has the basics.
 
-<Callout title="Coming with 0.7.0">
-  `decorateRequest`, typed decorations out of shared plugins, `ctx.route.security` and
-  `meta`, `describe()` with `ref()`, `scope.dev` and `scope.prefix`, `ctx.rawHeaders`,
-  `onSend(fn, { last: true })` and `trustProxy` are new in inkan 0.7.0.
+<Callout title="New in 0.7.0">
+  `decorateRequest` (async too, with `before` and `when`), typed decorations and routes out
+  of plugins, `ctx.route.security` and `meta`, `describe()` with `ref()`, `scope.dev` and
+  `scope.prefix`, `ctx.rawHeaders`, `onSend(fn, { last: true })`, `trustProxy` and the
+  `inkan` version range.
 </Callout>
 
 ## Shared or scoped
@@ -71,6 +72,29 @@ never for a request that does not ask. Hooks see it too, and setting `ctx.user =
 wins over `init`. `init` can read other decorations. Both refuse a name the context already
 has, so a plugin cannot hide `ctx.params` or another plugin's decoration.
 
+### Async decorations
+
+An `init` that returns a promise makes `ctx.user` that promise, typed `Promise<User>`: made
+once however often it is read, never for a request that does not read it, and a problem it
+throws is the answer.
+
+```ts
+app.decorateRequest("user", async (ctx) => {
+  const user = await sessions.load(ctx.cookies.sid);
+  if (!user) throw problem(401, "unauthorized");
+  return user;
+}, { before: "handler", when: (route) => route.security.length > 0 });
+
+app.get("/me", { security: { apiKey: "sid", in: "cookie" } }, ({ user }) => user.name); // the value, not a promise
+```
+
+With `before: "handler"` the promise is awaited after the input is checked and before the
+`preHandler` hooks, so they and the handler see the value itself, typed without the promise.
+That loads it for every request of the routes it covers, read or not, so `when` picks them,
+asked once per route with its `ctx.route` view. Reading it on a route `when` leaves out
+throws, instead of handing over a promise typed as the value; `onRequest` hooks, which run
+before it is awaited, still get the promise. Apps that do not use it pay nothing for it.
+
 ## Typed decorations out of shared plugins
 
 A shared plugin that returns its scope hands on the types of what it decorated. After
@@ -105,6 +129,31 @@ import type { Plugin } from "@vxnsin/inkan";
 
 export declare function session(options: { secret: string }): Plugin<{}, {}, { session: Session }>;
 ```
+
+## Routes out of plugins, in the typed client
+
+A plugin made with `plugin()`, shared or not, that returns its scope hands on the routes it
+defined in that chain. After `register`, the [typed client](/docs/client) knows them, under
+the prefix they were registered with:
+
+```ts
+const auth = plugin((app) =>
+  app
+    .post("/login", { body: t.object({ name: t.string(), password: t.string() }), response: { 200: t.object({ ok: t.boolean() }) } }, login)
+    .post("/logout", {}, logout),
+);
+
+export const api = inkan().register(auth, { prefix: "/auth" }).get("/teas", listTeas);
+
+// web.ts
+const shop = client<typeof api>("https://shop.example");
+await shop.post("/auth/login", { body: { name: "ana", password } }); // typed, body and answers
+```
+
+Prefixes add up through plugins that register others. A plain function passed to `register`
+hands no types on; neither do routes added one statement at a time. For a plugin written in
+JavaScript, the fourth type parameter says which routes it brings:
+`Plugin<Options, Needs, Adds, Routes>`.
 
 ## ctx.route: security and meta
 

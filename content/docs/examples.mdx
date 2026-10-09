@@ -50,11 +50,29 @@ the next one runs `after` it and uses it as a placeholder:
 { name: "the one just added", after: "POST /teas > a new oolong", params: { id: "{id}" }, expect: { name: "Da Hong Pao" } },
 ```
 
-`keep` reads `body.…`, `headers.…` or `status`. A placeholder alone (`"{id}"`) keeps the
-value's type; inside text (`"/teas/{id}"`) it becomes text. `beforeEach` runs once before
-the whole chain, so the examples in it see each other's data, and the order comes from
-`after`, never from the order of the files. The docs page runs the chain too when you
-press send.
+`keep` reads `body.…`, `headers.…`, `cookies.…` (a cookie the answer sets) or `status`. A
+placeholder alone (`"{id}"`) keeps the value's type; inside text (`"/teas/{id}"`) it
+becomes text. `beforeEach` runs once before the whole chain, so the examples in it see each
+other's data, and the order comes from `after`, never from the order of the files. The docs
+page runs the chain too when you press send.
+
+### Cookies
+
+The examples of one chain share a cookie jar, as a browser would. A cookie an answer sets
+goes with the requests after it that its `Path` covers, until an answer clears it
+(`Max-Age=0`, or an `Expires` gone by). So a login and a `/me` after it pass without
+copying the session by hand:
+
+```ts
+// POST /login
+{ name: "ana signs in", body: { name: "ana", password: "tea" }, keep: { sid: "cookies.sid" } },
+
+// GET /me
+{ name: "who she is", after: "POST /login > ana signs in", expect: { name: "ana" } },
+```
+
+Every chain starts with an empty jar, so nothing crosses into another chain. `keep` with
+`cookies.<name>` is for when you need the value itself, in a header or a body.
 
 For everything the examples do not cover, `app.inject()` sends a request
 straight in, without a socket:

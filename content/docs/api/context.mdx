@@ -158,6 +158,15 @@ app.post("/teas", { body: NewTea, response: { 201: Tea } }, ({ body, reply }) =>
 Another status, with extra headers if needed. It is typed to the statuses the contract
 lists, so `reply(418, …)` on a route that never promised a teapot does not compile.
 
+```ts
+return reply(200, body, { "set-cookie": ["a=1; Path=/", "b=2; Path=/; HttpOnly"] });
+```
+
+A list for `set-cookie` goes out as a line per entry, next to the cookies
+[`setCookie()`](#setcookie-clearcookie) made, so a proxy can pass an upstream's cookies on as
+they came. A list for any other header is joined with `", "`. The headers' type is exported
+as `ReplyHeaders`. New in 0.7.0.
+
 ## text()
 
 ```ts

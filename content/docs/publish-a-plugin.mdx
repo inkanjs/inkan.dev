@@ -7,19 +7,36 @@ A plugin is worth more once other people can find it. This page is about the ste
 [Writing a plugin](/docs/plugins): putting it on npm so it works with every inkan app, and
 listing it on [Hanko](/hanko), next to the official ones.
 
-<Callout title="Coming with 0.7.0">
+<Callout title="New in 0.7.0">
   `npx @vxnsin/inkan create plugin` and the `inkan` option of `plugin()` are new in inkan 0.7.0.
 </Callout>
 
 ## Start from the template
 
 ```sh
-npx @vxnsin/inkan create plugin tenant
+npx @vxnsin/inkan create plugin inkan-tenant          # into ./inkan-tenant
+npx @vxnsin/inkan create plugin @you/inkan-tenant pkg # a scoped name, into ./pkg
 ```
 
-Makes a folder with a shared plugin, a test that runs it through `app.inject`, a README to
-fill in, and a `package.json` that already has the name, the keyword and the peer dependency
-this page asks for. Everything below is what the template does for you, and why.
+`create plugin <name> [folder]` writes a package for a plugin of your own:
+
+```
+index.js          the plugin, plain JavaScript: no build step, what you test is what npm installs
+index.d.ts        its types, so ctx.tenant is typed after register
+test.ts           node --test on app.inject: no port, no network
+package.json      the name, the inkan-plugin keyword, inkan as a peer for the minor that runs
+README.md         install, the smallest example, the options
+tsconfig.json     for npm run typecheck
+LICENSE           MIT
+.github/workflows/ci.yml   typecheck and tests on Node 22 and 24
+.gitignore
+```
+
+The example plugin asks every request for a header, answers 400 without it, puts it on
+`ctx.tenant` and writes the header into OpenAPI with `describe()`: replace it, keep the
+shape. The function is named after the package (`inkan-tenant` → `tenant`). It refuses a
+name npm would not take, the `@inkanjs` scope, and a folder that is already there.
+Everything below is what the template does for you, and why.
 
 ## Naming
 
@@ -36,10 +53,10 @@ Name it after what it does, not after inkan: `inkan-tenant`, not `inkan-plugin-t
 ```json
 {
   "name": "inkan-tenant",
-  "keywords": ["inkan", "inkan-plugin"],
+  "keywords": ["inkan-plugin"],
   "type": "module",
   "peerDependencies": {
-    "@vxnsin/inkan": ">=0.7.0"
+    "@vxnsin/inkan": ">=0.7.0 <0.8.0"
   }
 }
 ```
@@ -47,7 +64,8 @@ Name it after what it does, not after inkan: `inkan-tenant`, not `inkan-plugin-t
 - **The keyword `inkan-plugin`** is how a plugin is found on npm, Hanko or not.
 - **inkan is a peer dependency**, never a dependency. The app brings its own inkan; a second
   copy in your package would give it a second `t`, a second `problem` and types that do not
-  line up. Put the oldest version you test against in the range.
+  line up. The template puts in the minor you build and test on; widen it once you have
+  tested against more.
 
 ## Say which inkan it works with
 
@@ -65,7 +83,17 @@ export const tenant = (o: { header: string }) =>
   });
 ```
 
-Keep the range the same as the peer dependency's.
+On any other version `register()` throws, so a plugin built against one inkan does not
+half-work on another:
+
+```
+inkan-tenant needs inkan >=0.7.0 <0.8.0, this app runs 0.9.1
+```
+
+Ranges read as npm reads them: `^`, `~`, `0.7.x`, `<`, `>=`, hyphens, spaces and `||`. A
+prerelease of inkan is in a range only when the range names a prerelease. A range that is
+not one throws where the plugin is made, not later. Keep it the same as the peer
+dependency's. `PluginOptions` is exported for the options' type.
 
 ## What makes a good one
 
@@ -84,7 +112,7 @@ Keep the range the same as the peer dependency's.
   import { test } from "node:test";
   import assert from "node:assert/strict";
   import { inkan } from "@vxnsin/inkan";
-  import { tenant } from "./index.ts";
+  import { tenant } from "./index.js";
 
   test("reads the tenant from the header", async () => {
     const app = inkan().register(tenant({ header: "x-tenant" })).get("/", (ctx) => ({ tenant: ctx.tenant }));
