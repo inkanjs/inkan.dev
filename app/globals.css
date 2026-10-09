@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "fumadocs-ui/css/neutral.css";
 @import "fumadocs-ui/css/preset.css";
-@import "fumadocs-twoslash/twoslash.css";
+@import "../node_modules/fumadocs-twoslash/styles/twoslash.css";
 
 /* The palette of the release pictures: warm dark paper, cream ink, seal red. */
 :root {
