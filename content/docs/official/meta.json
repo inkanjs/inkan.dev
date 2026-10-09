@@ -1,4 +1,4 @@
 {
   "title": "More middleware",
-  "pages": ["session", "secure-headers", "etag", "idempotency"]
+  "pages": ["auth", "session", "secure-headers", "etag", "idempotency"]
 }

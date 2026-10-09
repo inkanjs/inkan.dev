@@ -1,0 +1,492 @@
+---
+title: "Auth"
+description: "Sessions, JWTs, API keys and basic auth, roles, CSRF, 2FA, OAuth and refresh tokens, on node:crypto alone."
+---
+
+<Callout title="Coming with 0.7.0">
+  `@inkanjs/auth` comes with inkan 0.7.0 and needs it, and Node 22.18 or newer.
+</Callout>
+
+```sh
+npm i @inkanjs/auth
+```
+
+```ts
+import { auth } from "@inkanjs/auth";
+
+const login = auth({
+  secret: process.env.AUTH_SECRET!, // at least 32 bytes
+  users: {
+    find: (login: string) => db.users.byEmail(login), // { id, passwordHash, roles?, totpSecret? }
+    byId: (id: number) => db.users.get(id),
+  },
+});
+
+app
+  .register(login)
+  .get("/me/orders", { security: login.session }, ({ user }) => db.orders.of(user!.id))
+  .get("/admin/stats", { security: login.session, meta: { auth: { roles: ["admin"] } } }, () => stats());
+```
+
+That gives you `POST /auth/login`, `POST /auth/logout` and `GET /auth/me`, a session cookie,
+and `ctx.user` typed as whatever `users.find` returns. Hash passwords with `hashPassword`:
+
+```ts
+import { hashPassword } from "@inkanjs/auth";
+
+await db.users.insert({ email, passwordHash: await hashPassword(password) });
+```
+
+No dependencies: sessions, JWTs, scrypt, TOTP and OAuth all run on `node:crypto`. Every
+route it adds has a contract and examples, so it is in the OpenAPI document and covered by
+`inkan check`.
+
+## How it works
+
+The plugin is shared: register it on the app and it acts on every route. A route says what
+it takes with `security`, as inkan always had it; the plugin checks those credentials.
+
+| the request… | answer |
+| --- | --- |
+| carries none of the credentials the route asks for | 401 `unauthorized` (inkan itself) |
+| carries them, but they are wrong | 401 `invalid-credentials`, `token-expired` or `session-expired`, with `www-authenticate` for bearer and basic |
+| is fine, but `meta.auth.roles` names none of the user's roles | 403 `forbidden` |
+| comes with a credential cookie from another site | 403 `csrf` (unsafe methods only) |
+
+Several schemes on a route are alternatives: `security: ["bearer", login.session]` takes
+either. A route asking for a scheme the plugin was not configured for is refused, never let
+through.
+
+A route **without** `security` still knows who is logged in when the session cookie is
+there (`ctx.user`, or undefined; a bad cookie is ignored and cleared).
+
+## Credentials
+
+| scheme | on the route | configured by |
+| --- | --- | --- |
+| session cookie | `security: login.session` | on by default; `session: { … }` or `false` |
+| bearer JWT | `security: "bearer"` | `jwt: { jwks \| key \| secret, … }`, or `jwt: { issue }` for tokens of your own |
+| API key | `security: { apiKey: "x-api-key", in: "header" }` | `apiKeys: { verify(key, ctx) }` |
+| basic | `security: "basic"` | `basic: { verify(name, password, ctx), realm }` |
+
+### Session cookie
+
+The cookie holds a random 256-bit id and its HMAC; the session itself is in the
+[store](#store), under a hash of the id, so a leaked store holds no usable cookie.
+
+- `HttpOnly`, `SameSite=Lax`, `Secure` unless the request is for localhost (`secure: "auto"`).
+- A new id on every login, and the old session deleted: no session fixation.
+- `maxAge` (7 days) is enforced on the server, whatever the store does with its TTL.
+- A user that `byId` no longer finds ends the session.
+
+```ts
+auth({ secret, users, session: { cookie: "__Host-sid", maxAge: "12h", store: redisStore } });
+```
+
+`secret: [newSecret, oldSecret]` rotates: the first signs, all verify. Remove the old one
+once nothing signed with it can still be alive (the session `maxAge`).
+
+### JWT
+
+From your identity provider:
+
+```ts
+auth({
+  secret,
+  users,
+  jwt: {
+    jwks: "https://idp.example/.well-known/jwks.json",
+    algorithms: ["RS256"],
+    issuer: "https://idp.example/",
+    audience: "api",
+  },
+});
+```
+
+**`issuer` and `audience` are required.** A key set or a shared secret usually signs tokens
+for more than one API, and a token meant for another one must not open this one. Only when
+that cannot happen, say so with `unsafeSkipIssuer: true` or `unsafeSkipAudience: true`.
+
+- One of `jwks` (a URL), `key` (a public key) or `secret` (HS256/384/512, a shared secret).
+- The `algorithms` list is required, `none` is never accepted, and a key never works for
+  another algorithm family.
+- The user is `users.byId(claims.sub)`, or what `jwt.user(claims, ctx)` makes of the claims,
+  for an API without a user table.
+- If the provider's keys cannot be fetched, the last ones are used for up to an hour
+  (`jwksOptions.staleMs`), and a failed fetch waits `cooldownMs` (30 s) before the next try.
+  Without any usable keys the answer is a 503 at once.
+
+To issue tokens yourself, see [Refresh tokens](#refresh-tokens).
+
+### API keys and basic auth
+
+```ts
+import { hashToken } from "@inkanjs/auth";
+
+auth({
+  secret,
+  users,
+  apiKeys: { verify: (key, ctx) => db.apiKeys.userFor(hashToken(key)) },
+  basic: { verify: (name, password, ctx) => checkServiceAccount(name, password) },
+});
+
+app.get("/export", { security: { apiKey: "x-api-key", in: "header" } }, exportAll);
+```
+
+Every `{ apiKey, in }` scheme except the session cookie goes to `apiKeys.verify`. Store keys
+hashed (`hashToken`) and look them up by the hash; then nothing is compared by you.
+
+## ctx.user and ctx.auth
+
+```ts
+app.post("/signup", { body: NewUser }, async (ctx) => {
+  const user = await db.users.create(ctx.body);
+  await ctx.auth.login(user);                     // a session for a user you vouch for
+  return { id: user.id };
+});
+
+app.delete("/teas/:id", { security: login.session }, (ctx) => {
+  const user = ctx.auth.require("admin", "editor"); // the user, or a 401/403
+  return db.teas.remove(ctx.params.id, user.id);
+});
+```
+
+| | |
+| --- | --- |
+| `ctx.user` | the user, or undefined |
+| `ctx.auth.method` | `"session"`, `"jwt"`, `"apiKey"` or `"basic"` |
+| `ctx.auth.require(...roles)` | the user, or a 401; with roles, a 403 unless the user has one of them. Typed without the undefined |
+| `ctx.auth.login(user)` | starts a session, with a new id: after a signup, an invite, a flow of your own |
+| `ctx.auth.logout()` | ends the session and clears its cookie |
+
+The user type comes from `users.find` (or `byId`), or say it: `auth<User>({ … })`.
+
+## Roles
+
+```ts
+app.get("/admin/stats", { security: login.session, meta: { auth: { roles: ["admin"] } } }, stats);
+app.get("/dashboard", { meta: { auth: {} } }, dashboard); // logged in by session, any role
+```
+
+`meta.auth.roles` and `ctx.auth.require(...roles)` both need **one of** the roles. They come
+from `user.roles`, or from your `roles(user)` option. On a route without `security`,
+`meta: { auth: {} }` alone means "logged in, by session". `meta.auth.optional: true` makes
+wrong credentials leave `ctx.user` undefined instead of a 401; it never applies when roles
+are given. Routes with roles get the 403 in their OpenAPI operation.
+
+## The routes
+
+Under `routes` (`"/auth"`, or `false` for none). Each appears only when what it needs is
+configured:
+
+| route | needs | answers |
+| --- | --- | --- |
+| `POST /auth/login` `{ login, password, totp? }` | sessions, `users.find` | 200 `{ user }` and the cookie; 401, 403, 429, 503 |
+| `POST /auth/logout` `{ refreshToken? }` | sessions | 204, also without a session; 403 |
+| `GET /auth/me` | sessions or `jwt` | 200 the user; 401 |
+| `POST /auth/token` `{ login, password, totp? }` | `jwt.issue`, `users.find` | 200 `{ accessToken, tokenType, expiresIn, refreshToken }`; 401, 429, 503 |
+| `POST /auth/token/refresh` `{ refreshToken }` | `jwt.issue` | 200 a new pair; 401 |
+| `POST /auth/totp/setup` `{ password? }` | `totp` | 200 `{ secret, otpauthUrl }`; 401, 403, 409, 429 |
+| `POST /auth/totp/confirm` `{ code, password? }` | `totp` | 200 `{ recoveryCodes }`; 400, 401, 403, 409, 429 |
+| `POST /auth/totp/disable` `{ code, password }` | `totp` | 204; 400, 401, 403, 409, 429 |
+| `GET /auth/oauth/:provider` | `oauth` | 302 to the provider |
+| `GET /auth/oauth/:provider/callback` | `oauth` | 302 to `successRedirect`; 400, 401, 403, 502, or with `failureRedirect` always a 302 |
+
+`publicUser(user)` says what `/login` and `/me` show (default `{ id, roles }`), `userSchema`
+its contract.
+
+The problem types, for a client to tell them apart:
+
+| status | type |
+| --- | --- |
+| 400 | `totp-invalid` (confirm, disable), `oauth-state` |
+| 401 | `invalid-credentials`, `token-expired`, `session-expired`, `totp-required`, `totp-invalid`, `token-reused`, `token-revoked`, `oauth-denied`, `oauth-failed` |
+| 403 | `forbidden`, `csrf`, `reauth-required`, `reauth-failed`, `oauth-not-allowed` |
+| 409 | `totp-enabled`, `totp-not-enabled`, `totp-not-started` |
+| 429 | `too-many-attempts`, with `retry-after` |
+| 502 | `oauth-unavailable` |
+| 503 | `busy` (with `retry-after`), `auth-unavailable` |
+
+## Password login
+
+- Unknown logins and users without `passwordHash` are checked against a dummy hash made when
+  the plugin starts, so the answer takes as long as for a real user, and all three failures
+  read the same. A stored hash that cannot be parsed costs a full scrypt run too.
+- A stored hash may ask for at most one step over the default cost; anything above is
+  refused unchecked, so a tampered row cannot make one login take gigabytes. `hashPassword`
+  keeps to the same bounds.
+- With `users.updatePasswordHash(id, hash)`, a login whose hash was made with older scrypt
+  parameters stores a fresh one.
+- At most `hashing.concurrency` (4) password checks run at once; the rest wait up to
+  `hashing.waitMs` (1 s) for a slot, then get a 503 `busy` with `retry-after`. scrypt is
+  slow on purpose, and this keeps a burst of logins from taking the process with it.
+
+### Brute force
+
+Three counters, each with an exponential lockout once its free failures are used up: 1 s,
+2 s, 4 s, … up to `maxDelay` (15 minutes), as a 429 `too-many-attempts` with `retry-after`.
+
+| counter | free failures | |
+| --- | --- | --- |
+| the client address | `ipFreeAttempts` (50) | an IPv6 address counts by its /64. Checked first: a locked address writes no more counters. A successful login gives the address its attempt back |
+| the login, from that address | `freeAttempts` (5) | the fast lock against one guesser |
+| the login, from everywhere | `loginFreeAttempts` (100) | holds against a distributed guesser |
+
+Why two for the login: with only a per-login lock, anyone who knows your email could lock you
+out from one machine. Here one machine only locks itself; locking the account for everyone
+takes many failures from many addresses.
+
+A lockout skips the user lookup and the hash; a success clears the login's counters.
+Counters forget after `window` (15 minutes) of quiet. They live in `bruteForce.store`, by
+default a bounded store of their own, so a flood of made-up logins never pushes sessions or
+refresh tokens out of `store`. With several processes, give it a shared one.
+
+<Callout type="warn" title="Behind a proxy: not trustProxy: true">
+  The per-address counter is only as good as `ctx.ip`. `inkan({ trustProxy: true })` takes
+  the leftmost `X-Forwarded-For` entry, and the client writes that one: anyone can send
+  `X-Forwarded-For: 1.2.3.4` and be a new address on every request. Say how many proxies are
+  in front of the app (`trustProxy: 1` for one load balancer), or give a function that
+  recognizes their addresses. The plugin cannot see the app's `trustProxy`, so it cannot
+  warn you at startup.
+</Callout>
+
+```ts
+inkan({ trustProxy: 1 });                               // one proxy, it appends the client
+inkan({ trustProxy: (ip) => ip.startsWith("10.0.") }); // your proxies' addresses
+```
+
+## Two-factor: TOTP
+
+`totp: { issuer: "Tea Shop" }`, with `users.setTotpSecret(id, secret)`,
+`users.setRecoveryCodes(id, hashes)` and a `secret`, adds three routes for logged-in users:
+
+1. `POST /auth/totp/setup` answers `{ secret, otpauthUrl }`: show the URL as a QR code. The
+   secret waits ten minutes for a confirmation, sealed (AES-256-GCM with a key derived from
+   `secret`) in the store.
+2. `POST /auth/totp/confirm { code }` saves the secret with `setTotpSecret` and the hashes of
+   ten recovery codes with `setRecoveryCodes`, and answers the codes. Show them now; they
+   are never shown again. Give the user's `recoveryCodes` back as the hashes you were given.
+3. `POST /auth/totp/disable { password, code }` sets both to null.
+
+**Re-auth.** Setup and confirm change how the account logs in, so whoever sits at an open
+session must prove it is the user: with `password`, or by a login no older than
+`totp.reauth` (5 minutes); otherwise a 403 `reauth-required` (`reauth-failed` for a wrong
+password, which counts like a failed login). Disable always needs the password, and the
+current code or a recovery code; a user without a password needs a fresh login instead.
+
+From then on a password login without `totp` is a 401 `totp-required`, a wrong or reused
+code a 401 `totp-invalid`. A code works once: the last used step is kept. A **recovery code**
+works in its place, once each: `aaaa-bbbb-cccc-dddd`, 80 random bits, any case. This holds
+for every user with a `totpSecret`, whether or not the `totp` option is on.
+
+## OAuth: GitHub, Google, any OpenID provider
+
+```ts
+import { auth, oidcProvider } from "@inkanjs/auth";
+
+auth({
+  secret,
+  users,
+  oauth: {
+    baseUrl: "https://app.example", // for the redirect URI
+    github: { clientId, clientSecret },
+    google: { clientId, clientSecret },
+    providers: {
+      corp: { provider: oidcProvider({ issuer: "https://login.corp.example" }), clientId, clientSecret },
+    },
+    // your user, or nothing to refuse; link to an existing account only by a VERIFIED email
+    onLogin: async (profile, provider) =>
+      (await db.users.byProvider(provider, profile.id)) ??
+      (profile.emailVerified
+        ? await db.users.linkByEmail(profile.email, provider, profile.id)
+        : await db.users.create(provider, profile)),
+    successRedirect: "/",
+    failureRedirect: "/login", // optional: ?error=<type> instead of a problem
+  },
+});
+```
+
+`GET /auth/oauth/:provider` sends the browser off with a fresh `state` and a PKCE challenge
+(and a `nonce` for OpenID); they wait in a sealed, HttpOnly cookie for ten minutes.
+`GET /auth/oauth/:provider/callback` checks the state, exchanges the code with the
+verifier, verifies the id_token for OpenID, and hands `onLogin` the profile
+`{ id, email, emailVerified, name, avatarUrl, login? }`. Register
+`${baseUrl}/auth/oauth/<provider>/callback` with the provider. OAuth logs users in with a
+session, so it needs sessions on.
+
+<Callout type="warn" title="onLogin must link only verified emails">
+  Link a provider's login to an existing account only by a verified email
+  (`profile.emailVerified === true`), or by the provider's `id` you linked before. Many
+  providers let anyone put any address on an account; linking by an unverified email hands
+  your user's account to whoever typed their address. Without `emailVerified`, make a new
+  account or refuse.
+</Callout>
+
+## Refresh tokens
+
+`jwt: { issue: { expiresIn: "15m", refreshTtl: "30d", refreshMaxAge: "30d" } }` adds
+`POST /auth/token` and `POST /auth/token/refresh`, for clients that are not browsers:
+
+```
+POST /auth/token          { login, password }  → { accessToken, tokenType: "Bearer", expiresIn, refreshToken }
+POST /auth/token/refresh  { refreshToken }     → a new pair; the old refresh token is spent
+POST /auth/logout         { refreshToken }     → 204, that family revoked
+```
+
+- **Rotation.** Each refresh token works once; a refresh answers a new pair.
+- **Reuse detection.** Using a spent refresh token revokes it and every token that came
+  from it (401 `token-reused`), because one of the two users is a thief.
+- **Max age.** The tokens of one login are a family. It ends `refreshMaxAge` (30 days)
+  after the login, however often it rotates; then the user logs in again. `refreshTtl`
+  (30 days) is how long one refresh token lasts unused.
+- A revoked family stays revoked: its record is written once, at login, and after that only
+  to revoke it, and a refresh reads it again right before it issues anything.
+- `/token` has the same brute-force rules as `/login`.
+
+Access tokens are HS256 with a key derived from `secret` (never the secret itself), with
+`iss`, `aud`, `sub`, `jti`, `auth_time` (the login) and a `kid`. Refresh tokens are random
+and stored hashed.
+
+## CSRF
+
+Cookie-authenticated requests with an unsafe method (anything but GET, HEAD, OPTIONS) must
+come from your own pages: `Sec-Fetch-Site: same-origin`, or an `Origin` whose scheme and host
+are the request's or one of `origins`. Without either header such a request is refused.
+
+This holds for every credential a browser sends by itself: the session cookie, and an API
+key scheme with `in: "cookie"`. Bearer, basic and API keys in a header or the query are
+never checked: a browser does not add those by itself. `POST /auth/login` is checked too
+(login CSRF), but there a request without `Origin`, which is not a browser, goes on.
+
+```ts
+auth({ secret, users, origins: ["https://admin.example.com"] }); // another origin of yours
+```
+
+Behind a TLS-terminating proxy without `trustProxy`, the `Origin` fallback sees the wrong
+scheme: list your public origin in `origins`.
+
+## Store
+
+Sessions, refresh tokens, pending TOTP secrets and used TOTP steps live in `store`, by
+default `memoryStore()`, in the process. For several processes, give a shared one:
+
+```ts
+const store: AuthStore = {
+  get: (key) => redis.get(key).then((v) => (v ? JSON.parse(v) : undefined)),
+  set: (key, value, ttlSeconds) => redis.set(key, JSON.stringify(value), "EX", ttlSeconds),
+  delete: (key) => redis.del(key),
+  // these two must each be ONE atomic step of the store:
+  take: (key) => redis.getdel(key).then((v) => (v ? JSON.parse(v) : undefined)),
+  add: (key, value, ttlSeconds) =>
+    redis.set(key, JSON.stringify(value), "EX", ttlSeconds, "NX").then((r) => r === "OK"),
+};
+```
+
+`take(key)` reads and removes; `add(key, value, ttl)` writes only when the key is free and
+says whether it did. They are what makes a refresh token, a recovery code or a pending TOTP
+secret usable once across processes. A store without them still works, but those steps are
+then a read and a write, atomic only within one process. TTLs are in seconds.
+
+`memoryStore({ max })` keeps at most `max` entries (100 000), dropping the oldest first.
+
+## Options
+
+| option | default | |
+| --- | --- | --- |
+| `secret` | – | at least 32 bytes, or a list for rotation. Needed for sessions, OAuth, TOTP and own JWTs |
+| `users` | – | `find(login)`, `byId(id)`, `setTotpSecret(id, secret)`, `setRecoveryCodes(id, hashes)`, `updatePasswordHash(id, hash)` |
+| `session` | on | `{ cookie: "sid", maxAge: "7d", secure: "auto", sameSite: "Lax", domain, store }`, or `false` |
+| `jwt` | off | `{ jwks \| key \| secret, algorithms, issuer, audience, unsafeSkipIssuer, unsafeSkipAudience, clockTolerance, maxAge, user, issue }` |
+| `apiKeys` | off | `{ verify(key, ctx) }` |
+| `basic` | off | `{ verify(user, password, ctx), realm }` |
+| `totp` | off | `true` or `{ issuer, window: 1, account(user), reauth: "5m" }` |
+| `oauth` | off | `{ baseUrl, github, google, providers, onLogin, successRedirect: "/", failureRedirect }` |
+| `routes` | `"/auth"` | where the routes go; `false` for none |
+| `origins` | `[]` | other origins of yours for the CSRF check |
+| `store` | `memoryStore()` | `get`, `set(key, value, ttl)`, `delete`, and atomic `take`, `add` when shared |
+| `publicUser` | `{ id, roles }` | what `/login` and `/me` show |
+| `userSchema` | matches the default | the contract of `publicUser` |
+| `roles` | `user.roles` | a user's roles |
+| `password` | `{ ln: 17, r: 8, p: 1 }` | scrypt cost for the dummy hash and rehashing |
+| `hashing` | `{ concurrency: 4, waitMs: 1000 }` | password checks at once, and how long others wait |
+| `bruteForce` | on | `{ freeAttempts: 5, loginFreeAttempts: 100, ipFreeAttempts: 50, maxDelay: 900, window: 900, store }`, or `false` |
+
+Durations take seconds or a string like `"15m"`, `"12h"`, `"7d"`.
+
+## Helpers
+
+Exported for what the plugin does not do, such as password reset or invite links:
+
+| | |
+| --- | --- |
+| `hashPassword`, `verifyPassword`, `needsRehash` | scrypt, PHC-style strings |
+| `randomToken(bytes)`, `hashToken(token)`, `safeEqual(a, b)` | random tokens, stored hashed, compared in constant time |
+| `signJwt`, `verifyJwt`, `jwksSource` | JWTs for other services |
+| `github`, `google`, `oidcProvider` | providers for `oauth.providers` |
+| `memoryStore` | the store above |
+| `AuthError` | the errors of the helpers, with a stable `code` |
+
+A password reset, for instance: send `randomToken()` by mail, store `hashToken()` of it with
+an expiry, look it up by the hash once, delete it.
+
+```ts
+import { hashPassword, hashToken, randomToken } from "@inkanjs/auth";
+
+app.post("/password/forgot", { body: t.object({ email: t.string() }) }, async ({ body }) => {
+  const user = await db.users.byEmail(body.email);
+  if (user) {
+    const token = randomToken();
+    await db.resets.insert({ hash: hashToken(token), userId: user.id, expires: Date.now() + 3_600_000 });
+    await mail(user.email, `https://app.example/reset?token=${token}`);
+  }
+  return { ok: true }; // the same answer either way
+});
+
+app.post("/password/reset", { body: t.object({ token: t.string(), password: t.string() }) }, async ({ body }) => {
+  const reset = await db.resets.take(hashToken(body.token)); // read and delete
+  if (!reset || reset.expires < Date.now()) throw problem(400, "invalid-token");
+  await db.users.setPasswordHash(reset.userId, await hashPassword(body.password));
+  return { ok: true };
+});
+```
+
+The helpers are tested against the official vectors (RFC 7515, 8037, 6238, 4226, 4648, 7636).
+
+## Limits
+
+What it does not do, and where it relies on you:
+
+- **A process-local store is per process.** Behind several processes, use a shared `store`
+  and a shared `bruteForce.store`, or sessions, lockouts and refresh rotation do not hold
+  across them. The one-time steps need atomic `take` and `add`.
+- **Refresh rotation is atomic across processes only with an atomic `add`.** Without it,
+  two uses of one token at the same moment in two processes may both pass. A client that
+  sends the same refresh token twice at once loses its family: by design, it looks like
+  theft.
+- **Access tokens cannot be revoked** before they expire; keep `expiresIn` short. Sessions
+  can: logout deletes them on the server.
+- **No "log out everywhere".** Sessions are not indexed by user. After a password change,
+  end other sessions yourself, say with a `sessionsValidAfter` on the user that `byId`
+  checks. Sessions and access tokens also stay valid when TOTP is turned on or off.
+- **Lockouts are still a lever, if a smaller one.** Someone with many addresses can lock a
+  login for everyone (`loginFreeAttempts`), for up to `maxDelay`. That is why the lockout
+  is short and exponential.
+- **The address is what `ctx.ip` says.** Set `trustProxy` to the number of proxies, or a
+  function that knows them, never `true` (above).
+- **Basic auth and API keys have no brute-force counter.** Use long random keys, and
+  [`rateLimit`](/docs/built-in/rate-limit) in front.
+- Sessions have an absolute lifetime, no idle timeout.
+- `users.find` itself may take longer for a known login than for an unknown one; the dummy
+  hash covers the hashing, not your database.
+- Confirmed TOTP secrets are stored by you: encrypt them at rest if your database is shared.
+  Recovery codes reach you as hashes only.
+- `onLogin` decides who an OAuth login is; it is only as safe as its linking.
+- The CSRF check refuses cookie-authenticated unsafe requests without `Origin` or
+  `Sec-Fetch-Site`; every current browser sends one of them.
+- Passkeys/WebAuthn, magic links and password reset mails are not part of this package.
+
+## OpenAPI
+
+Every route it adds is in the document, with its contract and examples. Bearer schemes get
+`bearerFormat: "JWT"`, the session cookie scheme a description, and routes with roles or a
+cookie CSRF check their 403 answer.

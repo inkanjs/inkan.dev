@@ -101,10 +101,11 @@ every app needs. They come with inkan 0.7.0:
 
 | package | does |
 | --- | --- |
+| [`@inkanjs/auth`](/docs/official/auth) | sessions, JWTs, API keys and basic auth, roles, CSRF, 2FA, OAuth and refresh tokens, on `ctx.user` |
 | [`@inkanjs/session`](/docs/official/session) | cookie sessions, signed, encrypted or in a store, typed on `ctx.session` |
 | [`@inkanjs/secure-headers`](/docs/official/secure-headers) | a strict Content-Security-Policy with nonces, HSTS and the rest |
 | [`@inkanjs/etag`](/docs/official/etag) | ETags and `304 Not Modified`, hashed before compression |
 | [`@inkanjs/idempotency`](/docs/official/idempotency) | `Idempotency-Key`: a POST sent twice runs once |
 
-Each is a shared plugin: `app.register(session({ … }))`. To write one of your own, see
+Each is a shared plugin: `app.register(auth({ … }))`. To write one of your own, see
 [Writing a plugin](/docs/plugins).
