@@ -12,7 +12,8 @@ app.register(compress());
 Compresses answers with brotli or gzip, whichever the client's `accept-encoding` takes, and
 says so in `content-encoding` and `vary`. Streams are compressed as they go; server-sent
 events are left alone, so every event arrives when it is sent. Small bodies, HEAD, 204 and
-304 go as they are.
+304 go as they are. From 0.7.0 it runs after every other `onSend` hook, wherever it was
+registered, so a hook that reads the body (an [ETag](/docs/official/etag)) sees it unpacked.
 
 ## Options
 

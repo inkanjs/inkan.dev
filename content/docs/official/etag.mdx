@@ -1,0 +1,60 @@
+---
+title: "ETag"
+description: "ETags and 304 Not Modified, hashed before compression."
+---
+
+<Callout title="Coming with 0.7.0">
+  `@inkanjs/etag` comes with inkan 0.7.0 and needs it.
+</Callout>
+
+```sh
+npm i @inkanjs/etag
+```
+
+```ts
+import { etag } from "@inkanjs/etag";
+
+app
+  .register(etag())
+  .register(compress()) // in any order: compress always runs after etag
+  .get("/teas", () => listTeas());
+```
+
+```
+GET /teas                                → 200, etag: "kq3T…"
+GET /teas  if-none-match: "kq3T…"        → 304, no body
+```
+
+A client that already has an answer gets an empty 304 instead of the same body again. The
+tag is a hash of exactly the bytes that are sent.
+
+## Behaviour
+
+- **Which answers.** 2xx answers (not 204 or 206) to GET and HEAD whose body is whole: JSON,
+  text, a buffer. Streams, server-sent events and rows written one by one are left alone,
+  since their bytes are not known before they go out.
+- **Which bytes.** SHA-1, base64url, of the body as the client gets it: JSON as the contract
+  wrote it, text as UTF-8. `compress` runs after every other `onSend` hook
+  ([`last: true`](/docs/plugins)), so the tag is that of the
+  unpacked body, the same for gzip, brotli and none.
+- **If-None-Match.** A list, `*`, and `W/` tags, compared weakly as RFC 9110 asks: `W/"a"`
+  matches `"a"`. A match is a 304 with the tag and the other headers, without content-type,
+  content-length and the body.
+- **Your own tag.** An `etag` the handler set (a version number, an `updated_at`) is kept and
+  compared instead of hashing the body.
+- **The handler still runs** for a 304: the tag is of its answer. To save the work as well,
+  compare a tag of your own (a row version) in the handler.
+- If-Modified-Since, If-Match and ranges are not handled.
+
+## Options
+
+| option | default | |
+| --- | --- | --- |
+| `weak` | `false` | `W/"…"` instead of a strong tag |
+
+`etagOf(body, weak?)` and `noneMatch(header, tag)` are exported too.
+
+## OpenAPI
+
+Unchanged. It is a shared plugin: registered on the app it serves every route, inside a
+plugin only that plugin's routes.

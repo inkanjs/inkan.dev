@@ -15,12 +15,16 @@
     "---Guides---",
     "schemas",
     "streams",
+    "jobs",
     "client",
     "middleware",
     "hooks",
+    "plugins",
     "cli",
     "---Middleware---",
     "...built-in",
+    "---More middleware---",
+    "...official",
     "---Integrations---",
     "...integrations"
   ]

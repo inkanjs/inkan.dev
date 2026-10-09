@@ -93,3 +93,18 @@ with the plugins, and `listen` waits for it. In a plugin the routes go under its
 prefix. They are routes like any other, with the same contracts, in OpenAPI and
 in `inkan check`. Files starting with `_`, `.d.ts` and test files are left alone,
 so helpers can live next to the routes.
+
+## More middleware
+
+Next to the [built-in](/docs/built-in/cors) ones, packages under `@inkanjs` add what not
+every app needs. They come with inkan 0.7.0:
+
+| package | does |
+| --- | --- |
+| [`@inkanjs/session`](/docs/official/session) | cookie sessions, signed, encrypted or in a store, typed on `ctx.session` |
+| [`@inkanjs/secure-headers`](/docs/official/secure-headers) | a strict Content-Security-Policy with nonces, HSTS and the rest |
+| [`@inkanjs/etag`](/docs/official/etag) | ETags and `304 Not Modified`, hashed before compression |
+| [`@inkanjs/idempotency`](/docs/official/idempotency) | `Idempotency-Key`: a POST sent twice runs once |
+
+Each is a shared plugin: `app.register(session({ … }))`. To write one of your own, see
+[Writing a plugin](/docs/plugins).
