@@ -4,7 +4,9 @@ description: "Sessions, JWTs, API keys and basic auth, roles, CSRF, 2FA, OAuth a
 ---
 
 <Callout title="Coming with 0.7.0">
-  `@inkanjs/auth` comes with inkan 0.7.0 and needs it, and Node 22.18 or newer.
+  `@inkanjs/auth` comes with inkan 0.7.0 and needs it, and Node 22.18 or newer. It declares
+  `inkan: ">=0.7.0 <0.8.0"`, as every official package does: `register()` throws on another
+  version.
 </Callout>
 
 ```sh
@@ -57,8 +59,21 @@ Several schemes on a route are alternatives: `security: ["bearer", login.session
 either. A route asking for a scheme the plugin was not configured for is refused, never let
 through.
 
-A route **without** `security` still knows who is logged in when the session cookie is
-there (`ctx.user`, or undefined; a bad cookie is ignored and cleared).
+A route **without** `security` or `meta.auth` is public: it looks nobody up, so the store
+and `users.byId` are never asked, and `ctx.user` is undefined. A session cookie signed by us
+still lets its unsafe requests pass the CSRF check; one that is not is cleared. To know who
+is logged in on such a route when the cookie is there, give it
+`meta: { auth: { optional: true } }` (`ctx.user`, or undefined; wrong credentials leave it
+undefined instead of a 401, and a bad cookie is cleared). `meta: { auth: {} }` requires a
+logged-in user.
+
+The user is loaded once per request, before the input is read: wrong credentials, roles and
+CSRF are answered before any body is parsed. Hooks from `preHandler` on and the handler see
+`ctx.user` as the user itself, not a promise.
+
+```ts
+app.get("/", { meta: { auth: { optional: true } } }, (ctx) => (ctx.user ? `Hello, ${ctx.user.name}` : "Hello"));
+```
 
 ## Credentials
 
@@ -194,6 +209,13 @@ configured:
 
 `publicUser(user)` says what `/login` and `/me` show (default `{ id, roles }`), `userSchema`
 its contract.
+
+The routes reach the [typed client](/docs/client): after `app.register(auth({ … }))`,
+`client<typeof app>` knows `POST /auth/login` with its body and answers, under the `routes`
+path and the prefix the plugin was registered with. With
+`example: { login, password }` of a test account (without TOTP), `inkan check` logs in with
+it, keeps the session cookie in the chain's [cookie jar](/docs/examples#cookies), and calls
+`/me` and `/logout` with it.
 
 The problem types, for a client to tell them apart:
 
@@ -401,7 +423,8 @@ then a read and a write, atomic only within one process. TTLs are in seconds.
 | `basic` | off | `{ verify(user, password, ctx), realm }` |
 | `totp` | off | `true` or `{ issuer, window: 1, account(user), reauth: "5m" }` |
 | `oauth` | off | `{ baseUrl, github, google, providers, onLogin, successRedirect: "/", failureRedirect }` |
-| `routes` | `"/auth"` | where the routes go; `false` for none |
+| `routes` | `"/auth"` | where the routes go; `false` for none. They reach `client<typeof app>` |
+| `example` | none | `{ login, password }` of a test account (no TOTP): `inkan check` logs in with it, then calls `/me` and `/logout` with the session cookie |
 | `origins` | `[]` | other origins of yours for the CSRF check |
 | `store` | `memoryStore()` | `get`, `set(key, value, ttl)`, `delete`, and atomic `take`, `add` when shared |
 | `publicUser` | `{ id, roles }` | what `/login` and `/me` show |

@@ -111,7 +111,9 @@ every app needs. They come with inkan 0.7.0:
 | [`@inkanjs/otel`](/docs/official/otel) | OpenTelemetry: a `SERVER` span per request, named by its route |
 
 Most are shared plugins: `app.register(auth({ … }))`. `proxy()` brings routes of its own,
-and `circuit()` wraps a function. To write one of your own, see
+and `circuit()` wraps a function. Each names the inkan versions it works with,
+`inkan: ">=0.7.0 <0.8.0"`, the same range as its peer dependency, so `register()` throws on
+an app outside it instead of half-working. To write one of your own, see
 [Writing a plugin](/docs/plugins).
 
 Built-in, official and community: see everything on [Hanko](/hanko).
