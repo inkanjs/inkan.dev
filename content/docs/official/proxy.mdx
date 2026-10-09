@@ -1,0 +1,124 @@
+---
+title: "Proxy"
+description: "A prefix of the app, or one route, handed on to a server behind it, streamed both ways."
+---
+
+<Callout title="Coming with 0.7.0">
+  `@inkanjs/proxy` comes with inkan 0.7.0 and needs it.
+</Callout>
+
+```sh
+npm i @inkanjs/proxy
+```
+
+```ts
+import { proxy, proxyTo } from "@inkanjs/proxy";
+
+app
+  .register(proxy({ prefix: "/legacy", to: "http://legacy:8080" }))           // everything under /legacy, every method
+  .get("/status", proxyTo("http://status:9000/health"))                       // one route
+  .post("/uploads", { body: t.stream() }, proxyTo("http://files:9000/put"));  // one route, its body unread
+```
+
+```
+GET  /legacy/teas/1?x=1   → GET  http://legacy:8080/teas/1?x=1
+GET  /status?verbose=1    → GET  http://status:9000/health?verbose=1
+```
+
+Request and answer bodies stream through as they come, with backpressure, so a 2 GB upload
+or download never sits in memory. No dependencies.
+
+<Callout title="Credentials stay with your app" type="warn">
+  The client's `cookie` and `authorization` headers are not passed on by default: an
+  upstream that sees them can act as the user on your app. For an upstream in the same trust
+  domain (the same users and sessions, such as the old half of the same app), set
+  `forwardCredentials: true`. To give the upstream credentials of its own, use `headers`.
+</Callout>
+
+## Paths
+
+`proxy({ prefix: "/legacy", to: "http://legacy:8080/api" })` sends `/legacy/teas/1` to
+`/api/teas/1`: the rest of the path goes under `to`'s path, and the query as it came.
+`rewrite` gets that rest (`/teas/1`), and its answer goes under `to`'s path again.
+
+`proxyTo("http://status:9000/health")` asks for `/health` whatever the route's path was;
+with `rewrite`, for `to`'s path plus `rewrite(ctx.path)`.
+
+## Security
+
+- **No SSRF by construction.** `to` is fixed when the proxy is made, and every upstream
+  request goes to its host and port: no header, path or query of the request can name
+  another. A `rewrite` that returns an absolute URL is taken only for `to`'s own origin;
+  another is a 500. Never build `to` from what a client sent. Credentials for the upstream
+  go into `headers`; `to` refuses them.
+- **No climbing out of the mount.** A path with `.` or `..` segments (also as `%2e`), a
+  backslash, an escaped slash, backslash or NUL (`%2f`, `%5c`, `%00`), or any of these
+  escaped twice (`%252f`) is a 400 `bad-path`, so an upstream that decodes or normalizes
+  paths cannot be led to `/admin`. Repeated slashes become one.
+- **No forged forwarding headers.** The `x-forwarded-*` and `forwarded` headers that came in
+  are dropped. `x-forwarded-for` is `ctx.ip`, `x-forwarded-proto` is `ctx.protocol`, and
+  `x-forwarded-host` the request's Host; both honour the app's
+  [`trustProxy`](/docs/api/app#options), so behind your own load balancer they are the real
+  client's. With `trustForwarded: true` what came in is passed on and the client appended:
+  only when every request comes through proxies of yours. A Host no URL can hold is a 400
+  `bad-host`.
+- **Answer size is not limited.** Nothing is buffered, so memory is safe, but bandwidth and
+  time are the upstream's to spend. Bound the time with `deadline`; proxy only to upstreams
+  you run.
+- **TLS.** An `https:` upstream's certificate is checked as usual. For an internal CA, give
+  `agent: new https.Agent({ ca })`. Never set `rejectUnauthorized: false`.
+- **`onError` gets the raw error**, which can hold the upstream's address. Log it; the 502
+  the client gets names nothing.
+
+## Behaviour
+
+- **Headers.** Hop-by-hop headers are dropped both ways (`connection` and what it names,
+  `keep-alive`, `transfer-encoding`, `upgrade`, `te`, `trailer`, every `proxy-*`). `host` is
+  the upstream's. Every `set-cookie` of the upstream goes out as a line of its own.
+- **Redirects.** A `Location` on the upstream's own origin, under `to`'s path, becomes the
+  public path under the prefix (`/api/login` → `/legacy/login`), so the browser stays on the
+  host it asked. Anything else passes as it is; with a `rewrite`, the way back is yours to
+  give as a `rewriteLocation` function.
+- **Cookies.** The upstream's `set-cookie` loses its `Domain`, so it binds to the public
+  host, and a `Path` under `to`'s path moves under the prefix (`Path=/api/x` →
+  `Path=/legacy/x`). `cookieDomain: "keep"` passes them on untouched; a function maps the
+  domain.
+- **Errors.** An upstream that cannot be reached is a 502 `bad-gateway`; one silent past
+  `timeout`, or not done by `deadline`, a 504 `gateway-timeout`. `timeout` is an idle timeout,
+  reset by every byte: an upstream that trickles never trips it. `deadline` bounds the whole
+  exchange. An upstream that fails while its answer streams cuts the answer off there.
+- **Aborts.** A client that goes away closes the upstream request, before the answer and
+  while it streams.
+- **Bodies.** `proxy()` routes take the body as `t.stream()`. With `proxyTo` on a route that
+  reads its body (a `t.object`), the body is sent again as JSON. HEAD, 204 and 304 carry none.
+- **Hooks.** `proxy()` is not a shared plugin: its routes (`GET`, `HEAD`, `POST`, `PUT`,
+  `PATCH`, `DELETE` on `prefix/*path`) get the hooks of the scope around them, auth and rate
+  limits included. OPTIONS is inkan's own, or `cors`'s.
+- WebSocket upgrades are not proxied.
+
+## Options
+
+| option | default | |
+| --- | --- | --- |
+| `to` | required | the upstream: `http://host:port`, or with a path every request goes under |
+| `prefix` | `/` | `proxy()` only: the path it takes, in the scope it is registered in |
+| `rewrite` | none | `(path) => string`: the path to ask for |
+| `forwardCredentials` | `false` | pass the client's `cookie` and `authorization` on |
+| `headers` | none | headers for the upstream request, `null` removes one; or `(ctx) => headers` |
+| `timeout` | `30000` | idle timeout: ms the upstream may stay silent, reset by every byte; `0` for none |
+| `deadline` | `0` (none) | ms the whole exchange may take, body included |
+| `xForwarded` | `true` | set `x-forwarded-for`, `-proto` and `-host` |
+| `trustForwarded` | `false` | pass on the forwarding headers that came in, and append to the chain |
+| `rewriteLocation` | `true` | map the upstream's `Location` to the public path; `false`, or `(location, ctx) => string` |
+| `cookieDomain` | `"strip"` | drop `Domain` and move `Path` under the prefix; `"keep"`, or `(domain) => string` |
+| `agent` | Node's global agent | an `http.Agent` or `https.Agent`, for keep-alive or TLS options |
+| `hidden` | `true` | `proxy()` only: keep its routes out of the docs and OpenAPI |
+| `meta` | none | `proxy()` only: [`meta`](/docs/plugins#ctxroute-security-and-meta) of its routes |
+| `onError` | none | `(err, ctx)`, with the error behind a 502 |
+
+`proxyTo(to, options)` takes the same options but `prefix`, `hidden` and `meta`.
+
+## OpenAPI
+
+`proxy()`'s routes are hidden by default. A route with `proxyTo` is your own and is listed
+like any other.

@@ -106,8 +106,12 @@ every app needs. They come with inkan 0.7.0:
 | [`@inkanjs/secure-headers`](/docs/official/secure-headers) | a strict Content-Security-Policy with nonces, HSTS and the rest |
 | [`@inkanjs/etag`](/docs/official/etag) | ETags and `304 Not Modified`, hashed before compression |
 | [`@inkanjs/idempotency`](/docs/official/idempotency) | `Idempotency-Key`: a POST sent twice runs once |
+| [`@inkanjs/proxy`](/docs/official/proxy) | a prefix or a route handed on to a server behind it, streamed both ways |
+| [`@inkanjs/circuit-breaker`](/docs/official/circuit-breaker) | stop calling what keeps failing: around a call, or a circuit per route |
+| [`@inkanjs/otel`](/docs/official/otel) | OpenTelemetry: a `SERVER` span per request, named by its route |
 
-Each is a shared plugin: `app.register(auth({ … }))`. To write one of your own, see
+Most are shared plugins: `app.register(auth({ … }))`. `proxy()` brings routes of its own,
+and `circuit()` wraps a function. To write one of your own, see
 [Writing a plugin](/docs/plugins).
 
 Built-in, official and community: see everything on [Hanko](/hanko).
