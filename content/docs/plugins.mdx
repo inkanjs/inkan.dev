@@ -222,3 +222,9 @@ yourself: anyone can send it.
 `parseCookies(header)` and `serializeCookie(name, value, options)` are exported for plugins
 that read or write cookies on their own, with the same defaults as `ctx.setCookie`
 (`Path=/`, `HttpOnly`, `SameSite=Lax`).
+
+## Publishing it
+
+Name it `inkan-<name>`, keep inkan a peer dependency, and add it to the list: see
+[Publish a plugin](/docs/publish-a-plugin). Everything already out there, official and
+community, is on [Hanko](/hanko).

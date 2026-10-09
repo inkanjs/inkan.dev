@@ -1,0 +1,88 @@
+---
+title: "Publish a plugin"
+description: "Naming, peer dependencies, what makes a good plugin, and how to get it listed on Hanko."
+---
+
+A plugin is worth more once other people can find it. This page is about the step after
+[Writing a plugin](/docs/plugins): putting it on npm so it works with every inkan app, and
+listing it on [Hanko](/hanko), next to the official ones.
+
+## Naming
+
+| name | for |
+| --- | --- |
+| `inkan-<name>` | community plugins: `inkan-tenant`, `inkan-prometheus` |
+| `@you/inkan-<name>` | the same under your own scope, if you keep one |
+| `@inkanjs/*` | reserved for the official packages |
+
+Name it after what it does, not after inkan: `inkan-tenant`, not `inkan-plugin-tenant`.
+
+## package.json
+
+```json
+{
+  "name": "inkan-tenant",
+  "keywords": ["inkan", "inkan-plugin"],
+  "type": "module",
+  "peerDependencies": {
+    "@vxnsin/inkan": ">=0.7.0"
+  }
+}
+```
+
+- **The keyword `inkan-plugin`** is how a plugin is found on npm, Hanko or not.
+- **inkan is a peer dependency**, never a dependency. The app brings its own inkan; a second
+  copy in your package would give it a second `t`, a second `problem` and types that do not
+  line up. Put the oldest version you test against in the range.
+
+## What makes a good one
+
+- **Zero or few dependencies.** inkan has none, and the official middleware runs on
+  `node:crypto` alone. Every dependency you add is one every app installs.
+- **Typed through the app.** Make it a shared plugin that returns its scope, so `ctx.user` or
+  `ctx.tenant` is typed after `register` with no generics to write. See
+  [typed decorations](/docs/plugins#typed-decorations-out-of-shared-plugins).
+- **Honest in the OpenAPI document.** A plugin that adds a header, an answer or a security
+  scheme says so with [`describe()`](/docs/plugins#describe-adding-to-openapi). Then `/docs`
+  shows the 401 your plugin can send.
+- **Tested with `app.inject`.** No port, no network: build a small app, register the plugin,
+  inject requests.
+
+  ```ts
+  import { test } from "node:test";
+  import assert from "node:assert/strict";
+  import { inkan } from "@vxnsin/inkan";
+  import { tenant } from "./index.ts";
+
+  test("reads the tenant from the header", async () => {
+    const app = inkan().register(tenant({ header: "x-tenant" })).get("/", (ctx) => ({ tenant: ctx.tenant }));
+    const res = await app.inject({ method: "GET", url: "/", headers: { "x-tenant": "tea" } });
+    assert.deepEqual(res.body, { tenant: "tea" });
+  });
+  ```
+
+- **A README with three parts:** how to install it, the smallest example that does something,
+  and every option with its default. That README is what Hanko links to.
+
+## Getting listed on Hanko
+
+Open a pull request to [inkanjs/inkan.dev](https://github.com/inkanjs/inkan.dev) that adds
+one entry to the `community` part of `data/hanko.ts`:
+
+```ts notwoslash
+{
+  name: "inkan-tenant",
+  description: "One line: what it does, not how good it is.",
+  kind: "community",
+  href: "https://github.com/you/inkan-tenant#readme", // the README, or the npm page
+  npm: "inkan-tenant",
+  repo: "https://github.com/you/inkan-tenant",
+  tags: ["multi-tenant", "headers"],
+}
+```
+
+To be honest about what a listing means: community entries are looked over lightly before
+they go in (it is published, it does what the line says, it is MIT or similar), and that is
+all. They are not maintained, audited or supported by inkan. Issues and releases stay with
+their authors, and an entry whose package is gone or no longer works with a current inkan
+may be taken off the list.
