@@ -133,14 +133,38 @@ follow it as server-sent events, wait for its result, cancel it. Jobs run in thi
 ## describe()
 
 ```ts
-app.describe((op, route, components) => {
-  if (route.security?.length) op.responses["403"] ??= { description: "Not allowed for these credentials" };
+app.describe((op, route, components, ref) => {
+  if (route.security.length) op.responses["403"] ??= { description: "Not allowed for these credentials" };
+  if (route.spec.tags?.includes("billing")) {
+    op.responses["402"] ??= { description: "Pay first", content: { "application/json": { schema: ref(Invoice, "Invoice") } } };
+  }
 });
 ```
 
 Adds to the OpenAPI operation of every route in the scope: header parameters, answers,
 descriptions, details of a security scheme. It runs when the document is written, never
 per request, outer scopes first. New in 0.7.0.
+
+| argument | |
+| --- | --- |
+| `op` | the OpenAPI operation, to change |
+| `route` | an `OperationRoute`: the frozen [`ctx.route`](/docs/api/context#route) view (`method`, `path`, `security`, `meta`) plus the `spec` the route was written with. Read-only |
+| `components` | the document's components; `securitySchemes` holds the schemes the routes ask for |
+| `ref(schema, name?)` | lists a `t.*` schema once under `components.schemas` and returns `{ $ref }` to it. An unnamed schema needs `name` |
+
+## dev, prefix
+
+```ts
+const audit = plugin((scope) => {
+  if (scope.dev) scope.get("/_audit", () => recent());
+  logger.info(`audit under ${scope.prefix || "/"}`);
+});
+```
+
+Read-only. `dev` is whether the app runs in development (the `dev` option, by default
+`NODE_ENV` is not `"production"`), on the app and on every scope; set it with the option.
+`prefix` is the path prefix of the scope: `""` for the app, `"/v1"` for a plugin registered
+with `{ prefix: "/v1" }`. New in 0.7.0.
 
 ## layout()
 

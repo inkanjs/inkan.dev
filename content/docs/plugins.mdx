@@ -9,7 +9,8 @@ the plugin is for other people. The [hooks](/docs/hooks) page has the basics.
 
 <Callout title="Coming with 0.7.0">
   `decorateRequest`, typed decorations out of shared plugins, `ctx.route.security` and
-  `meta`, `describe()`, `onSend(fn, { last: true })` and `trustProxy` are new in inkan 0.7.0.
+  `meta`, `describe()` with `ref()`, `scope.dev` and `scope.prefix`, `ctx.rawHeaders`,
+  `onSend(fn, { last: true })` and `trustProxy` are new in inkan 0.7.0.
 </Callout>
 
 ## Shared or scoped
@@ -37,8 +38,22 @@ routes: an admin area, a webhook receiver.
 A **shared** plugin works in the scope it is registered in. Registered on the app, its hooks
 run for every route; registered inside another plugin, for that plugin's routes. Right for
 a plugin whose point is to act on the routes around it: a rate limit, sessions, headers.
-`rateLimit`, `compress` and every package under [More middleware](/docs/official/session)
+`rateLimit`, `compress` and every package under [More middleware](/docs/official/auth)
 are shared.
+
+### dev and prefix
+
+```ts
+const debug = plugin((scope) => {
+  if (!scope.dev) return;                                   // nothing in production
+  scope.get("/_debug", () => ({ mountedAt: scope.prefix || "/" }));
+});
+```
+
+Every scope says, read-only, whether the app runs in development (`scope.dev`, the app's
+`dev` option) and under which path prefix it was registered (`scope.prefix`: `""` for the
+app, `"/admin"` for `register(plugin, { prefix: "/admin" })`). A plugin that sets a cookie
+path or builds a link from its own routes reads `prefix` instead of asking for it again.
 
 ## decorate or decorateRequest
 
@@ -119,6 +134,24 @@ declare module "@vxnsin/inkan" {
 }
 ```
 
+`RouteMeta` takes symbol keys as well, so a plugin can keep a key to itself: one only it can
+write, which no route spec can set by accident.
+
+```ts
+export const INTERNAL = Symbol("my-plugin");
+
+declare module "@vxnsin/inkan" {
+  interface RouteMeta {
+    [INTERNAL]?: boolean;
+  }
+}
+```
+
+A hook that needs a header no route lists reads `ctx.rawHeaders`: `ctx.headers` is cut down
+to a route's header schema, `rawHeaders` is the request's as it arrived (read it, do not
+change it). `ctx.secure` and `ctx.protocol` say whether the request came over TLS, the
+proxies' word included under `trustProxy`.
+
 ## describe(): adding to OpenAPI
 
 A plugin that adds a header or an answer should say so in the document. `describe` runs for
@@ -133,10 +166,30 @@ app.describe((op, route, components) => {
 });
 ```
 
-`op` is the OpenAPI operation, `route` the route as inkan keeps it, `components` the
-document's components: `securitySchemes` already holds the schemes the routes ask for, and
-new sections (`responses`, `parameters`) are kept. Outer scopes' hooks run first. A hook
-added after the document was written still reaches it: it is written again.
+`op` is the OpenAPI operation, `components` the document's components: `securitySchemes`
+already holds the schemes the routes ask for, and new sections (`responses`, `parameters`)
+are kept. `route` is an `OperationRoute`: the frozen `ctx.route` view (`method`, `path`,
+`security`, `meta`) plus the `spec` the route was written with, read-only; change the
+operation instead. Outer scopes' hooks run first. A hook added after the document was
+written still reaches it: it is written again.
+
+The fourth argument, `ref(schema, name?)`, puts a `t.*` schema into the document once, under
+`components.schemas`, and returns `{ $ref }` to it, as a route's named schemas are. An
+unnamed schema needs `name`:
+
+```ts
+import { t } from "@vxnsin/inkan";
+
+const Locked = t.object({ until: t.string() });
+
+app.describe((op, route, components, ref) => {
+  if (!route.meta.locks) return;
+  op.responses["423"] ??= {
+    description: "Locked",
+    content: { "application/json": { schema: ref(Locked, "Locked") } },
+  };
+});
+```
 
 ## onSend order and `last`
 
@@ -150,6 +203,12 @@ app.onSend((ctx, answer) => sign(answer), { last: true });
 Last hooks run after every other `onSend` hook of the route, again outermost first.
 `compress` is one, so a hook that reads the body (an [ETag](/docs/official/etag), a
 signature) sees it before it is packed, wherever either was registered.
+
+## The pages inkan serves itself
+
+`/docs`, `/openapi.json` and `/_inkan` are answered before any hook runs, so no plugin's
+hooks (secure headers, auth, a rate limit) apply to them. To put hooks on one, turn it off
+(`docs: false`, `openapi: false`, `inspector: false`) and serve it from a route of your own.
 
 ## Behind a proxy
 
