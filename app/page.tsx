@@ -8,6 +8,7 @@ import { Contract } from "@/components/landing/contract";
 import { Playground } from "@/components/landing/playground";
 import { Clips } from "@/components/landing/clips";
 import { Bench, Integrations, Learn } from "@/components/landing/sections";
+import { Hanko } from "@/components/landing/hanko";
 import { app } from "@/server/app";
 
 /** A Server Component that asks the site's own API, in the same process, through direct(app). */
@@ -43,6 +44,7 @@ export default function Home() {
         <Clips />
         <Bench />
         <Integrations />
+        <Hanko />
         <Learn />
       </main>
       <Footer />
