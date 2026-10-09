@@ -31,3 +31,19 @@ pass your own with `{ fetch }`.
 
 Routes written one statement at a time (`app.get(...);`) work as always, but their type
 cannot collect them: a type only grows along a chain.
+
+## Events
+
+```ts
+for await (const e of shop.events("/exports/:id/events", { params: { id } })) {
+  if (e.event === "progress") bar.set(e.data.done / e.data.total); // typed by the event's schema
+  if (e.event === "end") break;
+}
+```
+
+`events(path, { params, query, headers, signal })` reads a route that answers with
+[`t.events(...)`](/docs/streams), as an async iterator. Each event is narrowed by its name,
+so `e.data` has the type of that event's schema. Leaving the loop, or aborting `signal`,
+closes the stream. A stream that does not open throws a `StreamError` with its `status`
+and its `problem`. Only routes with an events contract are offered as paths. New in 0.7.0;
+[jobs](/docs/jobs) use it to follow their progress.
