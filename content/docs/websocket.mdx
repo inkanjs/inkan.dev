@@ -1,0 +1,165 @@
+---
+title: "WebSockets"
+description: "app.ws: a socket with a contract both ways, a typed client, origins checked, limits set."
+---
+
+A WebSocket route is a route: the upgrade request is routed, goes through `onRequest`, the
+security, the params, query and header checks, middleware and `preHandler` like a GET, and
+only once all of them let it through does it become a socket. A no answers with its status
+(400, 401, 404, …) and no socket. RFC 6455 is written on `node:http`'s upgrade event, with no
+dependency.
+
+```ts
+const Say = t.discriminated("type", {
+  say: t.object({ type: t.literal("say"), text: t.string().max(200) }),
+  leave: t.object({ type: t.literal("leave") }),
+});
+const Said = t.object({ type: t.enum(["said", "joined"]), text: t.string(), from: t.string() });
+
+app.ws(
+  "/rooms/:room",
+  { summary: "A chat room", params: t.object({ room: t.string() }), query: t.object({ name: t.string() }), message: Say, send: Said },
+  (socket, ctx) => {
+    void socket.send({ type: "joined", text: ctx.params.room, from: ctx.query.name });
+    socket.on("message", (m) => {
+      if (m.type === "leave") return socket.close(4000, "bye");
+      void socket.send({ type: "said", text: m.text, from: ctx.query.name });
+    });
+  },
+);
+```
+
+## message and send
+
+`message` is what the client sends. With it, every message is JSON checked against it, typed
+in `socket.on("message")` and in `for await (const m of socket)`. One that is not JSON, or
+breaks the contract, closes the socket with 1007 and the reason (the path and the rule, never
+the value sent); a binary frame where the contract wants JSON closes it with 1003.
+
+`send` is what the server sends. `socket.send(v)` writes it as JSON with only what the
+contract lists, as a route's answer is trimmed. In development a value that breaks it throws
+(reported, and the socket closes with 1011).
+
+Without `message`, text arrives as a string and binary as a `Buffer`, a copy of its own.
+`sendRaw(data)` sends text or bytes as they are, past the contract.
+
+## The socket
+
+```ts
+app.ws("/feed", { send: Tick }, async (socket, ctx) => {
+  for (let n = 0; !ctx.signal.aborted; n++) {
+    await socket.send({ n }); // resolves once the socket takes more
+    await sleep(1000);
+  }
+});
+```
+
+| | |
+| --- | --- |
+| `send(value)` | JSON by the `send` contract. Resolves once the socket can take more, so `await` it in a loop that sends a lot; on a closing socket it does nothing |
+| `sendRaw(data)` | a string or bytes, as they are |
+| `close(code?, reason?)` | starts the closing handshake; default 1000, a reason of at most 123 bytes |
+| `on("message" \| "close" \| "error", fn)`, `off(…)` | `close` gets the code and the reason |
+| `for await (const m of socket)` | the messages as they come, until it closes |
+| `readyState` | 1 open, 2 closing, 3 closed |
+| `bufferedAmount` | bytes written but not yet handed to the network |
+
+`ctx` is the upgrade request's context, with its params, query, headers, decorations and
+`state`. `ctx.signal` aborts when the socket closes. Messages that come before the handler
+listens wait for it. A listener that throws is reported and closes the socket with 1011.
+
+## The typed client
+
+```ts
+const room = shop.ws("/rooms/:room", { params: { room: "tea" }, query: { name: "ana" } });
+room.on("message", (m) => m.type === "said" && show(m.text)); // narrowed by the route's send
+await room.ready;                                           // rejects when it closes first (a 401, a 404)
+room.send({ type: "say", text: "hello" });                  // typed by the route's message
+
+for await (const m of room) if (m.type === "joined") greet(m.from); // leaving the loop closes it
+```
+
+[`client.ws(path, { params, query })`](/docs/client) opens a WebSocket route with the
+platform's `WebSocket`: `http` becomes `ws`, `https` `wss`. In Node, `headers` go with the
+upgrade; a browser sends none. `raw` is the socket underneath, and `{ WebSocket }` in the
+client's options puts in another class. OpenAPI lists a WebSocket route as a GET with a 101
+and an `x-inkan-websocket` extension holding both schemas; the docs page shows it as `WS`.
+
+## Who may open it: origins
+
+A browser sends the user's cookies with a WebSocket upgrade from any page, and the
+same-origin policy does not stop that page from reading the answers. Without a check, a site
+the user happens to visit can open your socket as the user and talk on it: cross-site
+WebSocket hijacking. So inkan checks the `Origin` header browsers send before any hook runs.
+By default only the app's own origin (the Host header and `ctx.protocol`) may open the
+socket, and a request without an `Origin`, which is not a browser, goes through. Anything
+else is a 403 `origin-not-allowed`.
+
+```ts
+app.ws("/live", { origins: ["https://shop.example"] }, live);            // the own origin, and these
+app.ws("/live", { origins: (origin, ctx) => origin?.endsWith(".shop.example") ?? true }, live); // decides alone
+app.ws("/public", { origins: "*" }, feed);                               // every page
+
+inkan({ wsOrigins: ["https://admin.shop.example"] });                    // for every route without its own
+```
+
+A function gets the request before hooks and input checks (headers, protocol, path), so it
+cannot read decorations. Origins are compared as URL origins: `http://X:80` is `http://x`.
+
+## Options
+
+| option | default | |
+| --- | --- | --- |
+| `params`, `query`, `headers` | | checked on the upgrade request, as for a GET |
+| `message`, `send` | | the contracts, above |
+| `security`, `use`, `meta` | | as for any route: credentials, middleware, free-form meta |
+| `origins` | the app's `wsOrigins`, else the own origin | above |
+| `maxMessage` | `1048576` (1 MiB) | bytes one message may have, fragments together; past it, 1009 |
+| `heartbeat` | `30000` | ms between pings; a peer that has not answered the last one by the next is cut off. `false` for none |
+| `maxConnections` | none | sockets this route holds at once, handshakes on the way counted; past it the upgrade is a 503 `too-many-connections` |
+| `handshakeTimeout` | `10000` | ms the upgrade request has to get its answer (hooks, security, middleware) before the connection is cut |
+| `summary`, `description`, `tags`, `operationId`, `deprecated`, `hidden` | | for the docs and OpenAPI |
+
+Before any hook, too: an upgrade that is not a GET over HTTP/1.1 without a body is a 400, and
+`sec-websocket-key` has to be canonical base64. A plain request to a WebSocket path is a 426.
+
+## Close codes
+
+| code | when |
+| --- | --- |
+| 1001 | the server stops: on SIGINT or SIGTERM every socket is closed with it |
+| 1002 | a protocol error: an unmasked frame from the client, reserved bits, an unknown opcode, a bad close frame |
+| 1003 | binary where the `message` contract wants JSON text |
+| 1007 | text that is not UTF-8, a message that is not JSON or breaks `message` |
+| 1008 | more than 4 × `maxMessage` (1 MiB at least) waits to be written: the peer does not read, and is cut off |
+| 1009 | a message past `maxMessage`, or in more than 1024 frames |
+| 1011 | a listener threw, or in development `send` was handed a value that breaks its contract |
+
+Your own codes go from 4000 to 4999, as `socket.close(4000, "bye")` above.
+
+## Limits
+
+- **No permessage-deflate.** No extension is negotiated, so every frame goes as it is. No
+  subprotocol is chosen either; a hook may set `sec-websocket-protocol`.
+- **Not on `app.fetch`.** Bun, Deno and serverless platforms upgrade their own way. `listen`
+  listens for upgrades when the app has a WebSocket route; a server of your own takes
+  `server.on("upgrade", app.upgradeListener)`.
+- **A message comes in at most 1024 frames**, each after the first counted 64 bytes against
+  `maxMessage`; text is checked as UTF-8 frame by frame. A peer that floods pings without
+  reading gets only its latest one answered.
+- **Per process.** With `workers`, each process holds its own sockets. Broadcast with a `Set`
+  of sockets per process, or through a bus the processes share (Redis pub/sub, say):
+
+```ts
+import type { Infer, WsSocket } from "@vxnsin/inkan";
+
+const room = new Set<WsSocket<Infer<typeof Say>, Infer<typeof Said>>>();
+
+app.ws("/room", { message: Say, send: Said }, (socket) => {
+  room.add(socket);
+  socket.on("close", () => room.delete(socket));
+  socket.on("message", (m) => {
+    if (m.type === "say") room.forEach((s) => void s.send({ type: "said", text: m.text, from: "someone" }));
+  });
+});
+```

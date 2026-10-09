@@ -3,10 +3,6 @@ title: "Jobs"
 description: "Work that takes longer than a request: a queue, progress over SSE, and the result."
 ---
 
-<Callout title="Coming with 0.7.0">
-  `app.job` is new in inkan 0.7.0.
-</Callout>
-
 Some work does not fit in a request: an export of every order, a report over a million rows,
 a batch of images. A proxy gives up after a minute, the client after less. `app.job` takes
 the work off the request: one route starts it and answers at once, the others tell how it
@@ -138,6 +134,49 @@ app.job("/exports", { body: Range, owner: (ctx) => ctx.headers["x-user-id"] }, r
 Read the owner from what your auth hook made sure of, a session or a verified token, not
 from a header anyone can send. `security` on the job asks for credentials on all five routes.
 
+## On a schedule: every
+
+```ts
+app.job("/reports/nightly", { every: "0 3 * * *", result: Report }, async (job) => buildReport(job.signal));
+
+app.job(
+  "/exports",
+  { body: Range, every: { cron: "0 6 * * mon-fri", input: { from: "2026-01-01", to: "2026-12-31" }, timezone: "local" } },
+  run,
+);
+```
+
+`every` starts the job on a schedule as a POST would: the same queue, concurrency and store,
+without an owner, and the five routes are still there to look at it, follow it or cancel
+it. `job.ctx` of a scheduled run is a context of no real request: a POST to the job's path,
+no headers, its input as the body.
+
+| field | takes |
+| --- | --- |
+| minute | `0-59` |
+| hour | `0-23` |
+| day of month | `1-31` |
+| month | `1-12` or `jan`-`dec` |
+| day of week | `0-7` or `sun`-`sat` (0 and 7 are Sunday) |
+
+Each field takes `*`, a value, a range (`1-5`), a step (`*/15`, `10-50/20`, or `5/15` for
+from 5 to the end) and lists of these (`1,15,30-31`). As in Vixie cron, when both the day of
+month and the day of week are restricted, a day matches either one: `0 0 1 * mon` is the
+first of the month and every Monday. `@yearly`, `@monthly`, `@weekly`, `@daily`,
+`@midnight` and `@hourly` stand for what they say.
+
+- **Time zone.** UTC by default; `timezone: "local"` reads the cron in the process's own zone.
+- **Checked when the job is defined.** A wrong expression, a cron that never matches, another
+  zone, a path with parameters, or an `input` that breaks the `body` (a job with a `body`
+  needs one) stops the start with an error.
+- **No overlap.** A run is skipped while the last one the schedule started still waits or
+  runs.
+- **When it runs.** Schedules start once the app listens (or on `app.started()` for an
+  adapter) and stop on shutdown. Timers are unref'd and set for the next minute each time,
+  so they do not drift; waits past 24.8 days go in hops.
+- **With `workers`** only worker 1 runs the schedules, and a worker that replaces it takes
+  its place: a run starts once, not once per process.
+
 ## Options
 
 | option | default | |
@@ -149,6 +188,7 @@ from a header anyone can send. `security` on the job asks for credentials on all
 | `timeout` | none | milliseconds a job may run; past them it fails with a 504 problem and `job.signal` is aborted |
 | `owner` | | `(ctx) => string \| undefined`: whose job it is |
 | `store` | one memory store for the app | where jobs are kept (below) |
+| `every` | | a cron expression, or `{ cron, input, timezone }`: start it on a schedule (above) |
 | `examples` | | examples for starting one; the other four routes get examples built on the first |
 | `summary`, `description`, `tags`, `deprecated`, `hidden`, `security`, `name` | | as for any route; `name` names the job schema |
 

@@ -1,0 +1,96 @@
+---
+title: "Running in production"
+description: "env() for the configuration, pressure for overload, context() for code far from the handler."
+---
+
+Three things an app needs once it runs for real, each off until you ask for it.
+
+## env()
+
+```ts
+import { env, t } from "@vxnsin/inkan";
+
+export const config = env(t.object({
+  PORT: t.int().default(3000),
+  DATABASE_URL: t.string(),
+  LOG: t.enum(["pretty", "json"]).optional(),
+  DEBUG: t.boolean().default(false),
+}));
+
+config.PORT; // number
+```
+
+`env(schema, source = process.env)` checks the environment with a `t.object` schema, once,
+at startup. Values are coerced as a query string is: numbers, booleans (`true`, `false`,
+`1`, `0`), enums, defaults and optional fields. An empty variable (`PORT=`) counts as unset,
+so its default applies. It hands back the typed value, frozen.
+
+Anything wrong is one error that lists every problem at once, so a deploy fails on the first
+start with the whole list instead of one variable at a time:
+
+```
+inkan: 2 environment variables are not as expected:
+  PORT must be an integer, got "abc"
+  DATABASE_URL is required
+```
+
+The value of a variable whose name looks secret (`SECRET`, `TOKEN`, `KEY`, `PASSWORD`, in any
+case) is never part of the message: `API_TOKEN must be an integer`, without what it got.
+
+## pressure: overload protection
+
+```ts
+const app = inkan({
+  pressure: { eventLoopDelay: 200, heapUsed: "90%", exempt: ["/health"] },
+});
+
+app.get("/health", () => app.pressure()); // { under, reason?, eventLoopDelay, heapUsed, rss, at }
+```
+
+A server that takes every request when it is already too slow gets slower for all of them.
+With `pressure`, a timer (unref'd, every second) samples the event loop's delay, the heap,
+resident memory and your own `check()`, and sets one flag. While it is set, every request
+gets a 503 `under-pressure` problem with `retry-after`, before its body is read and before
+any hook, the log and the inspector. inkan's own pages and the `exempt` paths still answer.
+
+| option | default | |
+| --- | --- | --- |
+| `eventLoopDelay` | none | ms the event loop may lag: the 99th percentile since the last sample |
+| `heapUsed` | none | bytes of V8 heap in use, or a share of its limit such as `"90%"` |
+| `rss` | none | bytes of resident memory |
+| `check` | none | `() => boolean`, your own measure, run with every sample: true means under pressure. One that throws counts as no pressure |
+| `retryAfter` | `10` | seconds, for the `retry-after` header |
+| `exempt` | none | paths that answer however loaded the server is, such as a health route |
+| `interval` | `1000` | ms between samples |
+
+`app.pressure()` hands back the last sample, for a health route or a metric: `under`, the
+`reason` (`"eventLoopDelay"`, `"heapUsed"`, `"rss"` or `"check"`), and the numbers it read.
+Without the option it is `undefined`, there is no timer, and a request reads nothing for it.
+
+## context(): the request, anywhere
+
+```ts
+import { context, inkan } from "@vxnsin/inkan";
+
+const app = inkan({ context: true });
+
+export function log(message: string) {
+  console.log(`[${context()?.id ?? "-"}] ${message}`); // no ctx passed down
+}
+```
+
+With `context: true`, each request runs inside an `AsyncLocalStorage` holding its context,
+so code far from the handler (a logger, a database helper three calls down) reads
+`context()?.id` or `context()?.user` without having it passed. Concurrent requests never see
+each other's.
+
+- **Outside a request** (at startup, in a timer started outside one) `context()` is
+  `undefined`. With no app in the process that turned it on, it throws: it could only ever
+  hand back `undefined`.
+- **Jobs** run with their own `job.ctx`, never inside the store of the request that started
+  them, and timers inkan makes during a request do not keep that store either.
+- **Typed** by what you say: `context<Context & { user: User }>()`.
+- **The cost.** Off by default, and then a request pays nothing. On, it costs about
+  0.5-1 µs a request: 113 % of the time without it in `bench/inproc.mjs` (geomean), 10-25 %
+  on the smallest requests, a few % where a request does real work. Passing `ctx` along is
+  still the cheapest way; turn this on when that gets in the way.

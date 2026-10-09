@@ -47,3 +47,22 @@ so `e.data` has the type of that event's schema. Leaving the loop, or aborting `
 closes the stream. A stream that does not open throws a `StreamError` with its `status`
 and its `problem`. Only routes with an events contract are offered as paths. New in 0.7.0;
 [jobs](/docs/jobs) use it to follow their progress.
+
+## WebSockets
+
+```ts
+const room = shop.ws("/rooms/:room", { params: { room: "tea" }, query: { name: "ana" } });
+await room.ready;
+room.send({ type: "say", text: "hello" });           // typed by the route's message
+for await (const m of room) if (m.type === "said") show(m.text); // typed by its send
+```
+
+`ws(path, { params, query, headers })` opens a route made with [`app.ws`](/docs/websocket)
+with the platform's `WebSocket`. Leaving a `for await` loop closes it; `headers` go with the
+upgrade only in Node. New in 0.7.0.
+
+## Routes out of plugins
+
+Routes a plugin defines in its chain and returns with its scope reach the client after
+`register`, under their prefix: see
+[Writing a plugin](/docs/plugins#routes-out-of-plugins-in-the-typed-client). New in 0.7.0.

@@ -115,7 +115,9 @@ app.get("/me", ({ user }) => user); // typed
 
 A value made anew for each request. The function runs the first time a request reads
 `ctx.user`, and the value is kept for the rest of that request; a request that never reads
-it never makes it. Names are refused as with `decorate`. New in 0.7.0.
+it never makes it. Names are refused as with `decorate`. An `init` that returns a promise,
+with `{ before: "handler", when }`, is awaited before the handler: see
+[async decorations](/docs/plugins#async-decorations). New in 0.7.0.
 
 ## job()
 
@@ -128,7 +130,23 @@ app.job("/exports", { body: Range, progress: Progress, result: Export }, async (
 
 Work that takes longer than a request, as five routes around a queue: start it, look at it,
 follow it as server-sent events, wait for its result, cancel it. Jobs run in this process.
-[Jobs](/docs/jobs) has the routes, the options and the limits. New in 0.7.0.
+[Jobs](/docs/jobs) has the routes, the options and the limits. `every` starts one on a cron
+schedule. New in 0.7.0.
+
+## ws()
+
+```ts
+app.ws("/rooms/:room", { params: t.object({ room: t.string() }), message: Say, send: Said }, (socket, ctx) => {
+  socket.on("message", (m) => {
+    if (m.type === "say") void socket.send({ type: "said", text: m.text, from: ctx.params.room });
+  });
+});
+```
+
+A WebSocket route: the upgrade goes through the hooks, the security and the input checks
+like a GET, then the socket speaks JSON by the `message` and `send` contracts.
+[WebSockets](/docs/websocket) has the socket, the origins, the options and the close codes.
+New in 0.7.0.
 
 ## describe()
 
@@ -285,6 +303,9 @@ Runs every route's examples against the app, as `inkan check` does from the comm
 | `gracefulShutdown` | `true` | lets open requests finish on SIGINT and SIGTERM |
 | `workers` | one process | `"auto"` or a number: a process per core, one port |
 | `trustProxy` | off | believe the proxies in front about the client: `true` for every one, a number of hops, or `(ip) => boolean` for the addresses that are yours. `ctx.ip`, and with it `rateLimit`, then reads `x-forwarded-for` or `forwarded`. New in 0.7.0 |
+| `wsOrigins` | the own origin | the pages that may open the app's WebSockets, for every route without `origins` of its own; see [WebSockets](/docs/websocket#who-may-open-it-origins). New in 0.7.0 |
+| `pressure` | off | overload protection: a 503 `under-pressure` while the event loop lags or memory runs high; `app.pressure()` hands back the last sample. See [Running in production](/docs/runtime#pressure-overload-protection). New in 0.7.0 |
+| `context` | `false` | answer each request inside an AsyncLocalStorage, for [`context()`](/docs/runtime#context-the-request-anywhere). New in 0.7.0 |
 | `dev` | `NODE_ENV !== "production"` | development mode |
 | `onError` | `console.error` | sees every error that becomes a 500 |
 | `seal` | | the contracts `inkan seal` stamped into code |
