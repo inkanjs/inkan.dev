@@ -92,6 +92,14 @@ export default function Benchmarks() {
               Your routes are not these routes. Measure the ones you have: the bench is a folder in the repository, and the
               same workflow runs it on GitHub for anyone.
             </p>
+            <p className="mt-4 text-soft">
+              The apps for Fastify, Hono and Express are written by us, and a benchmark is only as fair as those are. If you
+              know a faster way to write one of them that does the same work,{" "}
+              <a href="https://github.com/inkanjs/inkan/tree/main/bench" className="text-hot underline underline-offset-4">
+                send a pull request
+              </a>
+              : the numbers here will change with it.
+            </p>
             <p className="mt-6 font-mono text-xs text-muted">
               this run: {run.date} · Node {run.node} · {run.machine} ·{" "}
               <a href={run.workflow} className="text-hot underline underline-offset-4">
