@@ -49,7 +49,7 @@ a `Collection` (the keys go there, messages into `options.events` of its databas
 | --- | --- | --- |
 | `collection` | `"inkan_store"` | the collection for the keys, when a `Db` is given |
 | `events` | `"inkan_events"` | the collection for publish/subscribe messages |
-| `prefix` | `""` | put in front of every key and channel |
+| `prefix` | `"inkan:"` | put in front of every key and channel; ends in `:` (added when missing) |
 | `create` | `true` | create the TTL indexes on first use; `false` when your migrations do it |
 | `changeStreams` | `"auto"` | `true`, `false`, or `"auto"`: change streams when the server is a replica set or mongos |
 | `poll` | `1000` | ms between two reads of the messages without change streams |
@@ -83,8 +83,33 @@ over.
   do not exist: the collection is read every `poll` ms while someone listens, so a message
   arrives **up to about a second** later. Messages are kept a minute (a TTL index on `at`).
 
+## Security
+
+- **Publish/subscribe has no authentication.** A message is whatever arrives on the channel:
+  anyone who can insert into the `events` collection can send one, and inkan's jobs act on
+  them (a forged message can cancel a running job or report false progress). Use a MongoDB
+  user of its own for the app with a role limited to the two collections, and no other user
+  with write access to them. Do not share the database with tenants you do not trust.
+- **Writing the store is trusting it.** Whoever can write the keys can forge sessions,
+  idempotent replies, job records and rate-limit counts, and whoever can read them reads
+  every session. Give the app's database user access to the store's two collections (`find,
+  insert, update, remove`, `createIndex` with `create: true`, and `changeStream` on the
+  events) and nothing else, and nobody else write access to them.
+- **Values are stored as JSON text**, as they are given: not encrypted, not signed. Keep
+  secrets out of them or encrypt them yourself; keys are stored as given too (under the
+  prefix), so do not put secrets in keys.
+- **Errors carry no keys or values.** A failing command rejects with a new `Error` that
+  keeps `code` and `codeName`, its message without the "dup key" part and with every quoted
+  part replaced by `"…"`; the driver's `keyValue`, `keyPattern` and `errorResponse` are not
+  passed on. Log them freely.
+
 ## Limits
 
+- **Keys and the prefix.** The prefix (default `"inkan:"`) ends in `:`; one without gets
+  it (`"app"` is `"app:"`), so prefix `"app"` with key `"1x"` and prefix `"app1"` with key
+  `"x"` stay apart. `""` puts nothing in front. Do not give one use a prefix that starts
+  another's (`"app:"` and `"app:sessions:"` can meet). A key or channel holding NUL (`\0`) or a
+  lone UTF-16 surrogate is refused with a `TypeError`, in all four inkan stores alike.
 - **TTL monitor.** MongoDB deletes expired documents about once a minute, not at `e`.
   Nothing returns them in the meantime (every read filters on `e > $$NOW`, and `add` and
   `increment` treat them as absent), but they take space until then.
@@ -115,6 +140,3 @@ over.
   counted and no key is kept forever by mistake.
 - The TTL index deletes expired documents about once a minute; until then they are on disk.
   Every read filters them out, but a copy of the database holds them.
-- **`increment` counts numbers only.** On a key whose value is not a JSON number (a string,
-  even `"5"`, a boolean, `null`, an object) it rejects with a `TypeError` and leaves the value
-  as it was, so a counter cannot be reset by writing text over it.

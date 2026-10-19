@@ -56,7 +56,7 @@ in any worker, and progress and cancels reach the others through LISTEN/NOTIFY.
 | --- | --- | --- |
 | `table` | `"inkan_store"` | the table; letters, digits and `_`, at most 63 |
 | `schema` | the `search_path` | the schema the table is in; it must exist |
-| `prefix` | `""` | put in front of every key and channel, for two apps on one table |
+| `prefix` | `"inkan:"` | put in front of every key and channel, for two apps on one table; ends in `:` (added when missing) |
 | `create` | `true` | create the table and its index when they are missing |
 | `sweep` | `60000` | delete expired rows once at startup and then every this many ms; `0` turns it off |
 | `listener` | from the pool | pg only: the connection LISTEN runs on (see below) |
@@ -113,6 +113,28 @@ The driver is told apart by its methods: postgres.js has `unsafe` and `listen`, 
 - The suite from `@vxnsin/inkan/testing` (`storeConformance`, see [writing an adapter](/docs/storage#writing-an-adapter)) passes on a pg Pool, a pg
   Client and postgres.js.
 
+## Security
+
+- **Publish/subscribe has no authentication.** A message is whatever arrives on the channel:
+  any role that can connect to the database can `NOTIFY` (or `select pg_notify(…)`) any
+  channel, without a grant, so anyone with a login to that database can send one, and
+  inkan's jobs act on them (a forged message can cancel a running job or report false
+  progress). The channel names are hashes of table, prefix and channel, which hides nothing
+  from someone who knows them. Give the app a database of its own, and `CONNECT` on it only
+  to the roles that should be able to talk to the app. Do not share the database with
+  tenants you do not trust.
+- **Writing the store is trusting it.** Whoever can write the keys can forge sessions,
+  idempotent replies, job records and rate-limit counts, and whoever can read them reads
+  every session. Give the app's database user access to the store's table (`select, insert,
+  update, delete` on it) and nothing else, and nobody else write access to it.
+- **Values are stored as JSON text**, as they are given: not encrypted, not signed. Keep
+  secrets out of them or encrypt them yourself; keys are stored as given too (under the
+  prefix), so do not put secrets in keys.
+- **Errors carry no keys or values.** A failing statement rejects with a new `Error` that
+  keeps `code`, `severity`, `where` and the schema, table, column and constraint names, its
+  message with every quoted part replaced by `"…"`; pg's `detail` ("Key (value)=(…)") and
+  postgres.js's `query` and `parameters` are not passed on. Log them freely.
+
 ## Limits
 
 - **NOTIFY payloads are under 8000 bytes.** `publish` rejects a larger message (as JSON) with
@@ -127,9 +149,17 @@ The driver is told apart by its methods: postgres.js has `unsafe` and `listen`, 
 - `now()` is the start of the transaction, so the TTL counts from when the statement began.
 - The sweep runs in every process that has the store; the deletes overlap harmlessly. Rows
   without a TTL stay until deleted.
-- The database should be UTF-8, or values with characters its encoding lacks fail. A key
-  cannot contain the NUL character `\0` (PostgreSQL text cannot hold it); in a value it is
-  escaped by JSON and fine.
+- The database should be UTF-8, or values with characters its encoding lacks fail.
+- **Keys and the prefix.** The prefix (default `"inkan:"`) ends in `:`; one without gets
+  it (`"app"` is `"app:"`), so prefix `"app"` with key `"1x"` and prefix `"app1"` with key
+  `"x"` stay apart. `""` puts nothing in front. Do not give one use a prefix that starts
+  another's (`"app:"` and `"app:sessions:"` can meet). A key or channel holding NUL (`\0`,
+  which PostgreSQL text cannot hold) or a lone UTF-16 surrogate is refused with a `TypeError`,
+  in all four inkan stores alike; in a value either is escaped by JSON and fine.
+- **Long keys.** A key (with its prefix) longer than 2048 bytes of UTF-8 is kept under
+  `\x01sha256:<hex>` of it (`storedKey`), as in @inkanjs/mysql, so it fits the primary key's
+  btree. Two different keys share a row only if SHA-256 collides; keys starting with `\x01`
+  are hashed too, so no key can pose as a hash.
 - Every call is a round trip. For thousands of increments a second, Redis is the better
   store.
 
@@ -152,6 +182,3 @@ The driver is told apart by its methods: postgres.js has `unsafe` and `listen`, 
   ten years, or the call throws. A bad duration cannot turn into a row that never expires.
 - A connection whose `LISTEN` fails goes back to the pool closed, without the store's
   handlers, so retries leak nothing.
-- **`increment` counts numbers only.** On a key whose value is not a JSON number (a string,
-  even `"5"`, a boolean, `null`, an object) it rejects with a `TypeError` and leaves the value
-  as it was, so a counter cannot be reset by writing text over it.
