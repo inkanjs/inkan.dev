@@ -124,21 +124,3 @@ other object is refused.
   commands go (every command touches one key), but is not tested here.
 - Memory: keys without a TTL stay until deleted. Set `maxmemory-policy` with that in mind;
   `volatile-*` policies only ever evict keys that have a TTL.
-
-## Security
-
-- **Whoever can write to the Redis, under the prefix, writes your state**: sessions, refresh
-  tokens, job records, login counters. Treat the store like the database of your users. Use
-  Redis ACLs and a password, TLS (`rediss://`) when it is not on the same host, and never
-  expose it to the internet. A `prefix` keeps two apps from meeting by accident; it is no
-  boundary between people who distrust each other: give those a Redis (or an ACL) each.
-- **No key or value becomes a command.** Keys and values go as arguments of their command;
-  the two Lua scripts are fixed text that takes the key as `KEYS[1]`. A key with `*`,
-  `:` or spaces is only ever that key.
-- **Values are read back with `JSON.parse`** alone, no reviver: what comes back is data, never
-  code or a class instance.
-- **TTLs are checked**: a TTL must be a finite number of milliseconds, more than 0 and at most
-  ten years, or the call throws (a `TypeError` or `RangeError`). A bad duration cannot turn
-  into a key that never expires.
-- **Messages are not signed.** Anyone who can `PUBLISH` on the Redis can send a job's
-  progress or a cancel to the app; that is the same trust as writing its keys.

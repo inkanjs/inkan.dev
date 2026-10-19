@@ -122,21 +122,3 @@ over.
   (`mongod --replSet rs0` and `rs.initiate()`) is enough.
 - `publish` reaches subscribers in the order one process published, when it awaits each
   `publish`. A message sent while nobody listens is lost, as the `Store` contract allows.
-
-## Security
-
-- **No operator injection.** A key is only ever matched as `{ _id: key }`, a string, and
-  values are kept as JSON text, so a value like `{ "$where": … }` or one with dotted fields
-  is stored as text and comes back as it went in, never read as a query.
-- **Whoever can write the collections writes your state**: sessions, refresh tokens, job
-  records, and messages to the app (a job's progress, a cancel). Give the app a user whose
-  role reaches only its database, with TLS and authentication on the connection; both are
-  your client's settings.
-- **Messages dated in the future are ignored.** The poller reads only messages dated up to
-  five seconds past the server's clock, so one written with a date far ahead can neither
-  arrive late nor hold back the messages after it.
-- **Numbers are checked**: a TTL must be a finite number of milliseconds, more than 0 and at
-  most ten years, and `increment` takes only a finite step, so no `NaN` or `null` is ever
-  counted and no key is kept forever by mistake.
-- The TTL index deletes expired documents about once a minute; until then they are on disk.
-  Every read filters them out, but a copy of the database holds them.

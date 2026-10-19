@@ -128,23 +128,3 @@ CREATE TABLE inkan_events (
   `mysql2` 3. MariaDB is not supported (its JSON is text).
 - `publish` reaches subscribers in the order one process published, when it awaits each
   `publish`. A message sent while nobody listens is lost, as the `Store` contract allows.
-
-## Security
-
-- **Prepared statements only.** Every key, value and TTL is a parameter of a server-side
-  prepared statement (`pool.execute`), never escaped into the SQL text, so neither
-  `NO_BACKSLASH_ESCAPES` nor a multibyte client charset (gbk, big5, sjis) can turn a key into
-  SQL. The only names in the SQL text are the two table names, checked against
-  `/^[A-Za-z_][A-Za-z0-9_]*$/` and quoted.
-- **Exact keys.** Keys are compared as bytes: `a`, `A`, `a ` and `ä` are four keys, so no
-  collation can make one user's key match another's. A key longer than 255 bytes is kept under
-  its SHA-256, and keys that start with `\x01` are hashed too, so no key can pose as a hash.
-- **Least privilege.** The app's user needs `SELECT`, `INSERT`, `UPDATE` and `DELETE` on both
-  tables, and `CREATE` only with `create: true`.
-- **Messages dated in the future are ignored.** The poller reads only messages dated up to
-  five seconds past the database's clock, so a row written with a date far ahead can neither
-  arrive late nor hold back the messages after it. Whoever can insert into the events table
-  can still send the app a message (a cancel): that is the same trust as writing its keys.
-- **Numbers are checked**: a TTL must be a finite number of milliseconds, more than 0 and at
-  most ten years, so no TTL overflows `DATETIME` into a `NULL` that never expires, and
-  `increment` takes only a finite step.

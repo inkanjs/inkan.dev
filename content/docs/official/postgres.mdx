@@ -162,23 +162,3 @@ The driver is told apart by its methods: postgres.js has `unsafe` and `listen`, 
   are hashed too, so no key can pose as a hash.
 - Every call is a round trip. For thousands of increments a second, Redis is the better
   store.
-
-## Security
-
-- **No SQL from input.** Every key, value and TTL is a query parameter. `table` and `schema`
-  are checked against `/^[A-Za-z_][A-Za-z0-9_]*$/` before any SQL and then quoted; anything
-  else throws when the store is made. Channel names never reach SQL as given: each is a
-  hash (`inkan_<40 hex>`).
-- **Least privilege.** The role the store runs as needs `SELECT`, `INSERT`, `UPDATE` and
-  `DELETE` on its table, and `CREATE` on the schema only with `create: true`. With
-  `create: false`, create the table in a migration and give the app no DDL rights at all.
-- **`LISTEN` and `NOTIFY` are open to every role** that can connect to the database:
-  PostgreSQL has no permissions on channels. Any of them can hear the store's messages (job
-  progress) and send some (a cancel). Keep the store in a database only your app connects to,
-  or one whose users you trust as you trust the app.
-- **Whoever can write the table writes your state**: sessions, refresh tokens, job records.
-  Treat it like the table of your users, in backups too.
-- **TTLs are checked**: a TTL must be a finite number of milliseconds, more than 0 and at most
-  ten years, or the call throws. A bad duration cannot turn into a row that never expires.
-- A connection whose `LISTEN` fails goes back to the pool closed, without the store's
-  handlers, so retries leak nothing.
