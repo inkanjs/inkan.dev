@@ -1,0 +1,121 @@
+---
+title: "Stability"
+description: "What stays as it is from 0.8.0, what may still change, and the names that changed in 0.8.0."
+---
+
+From 0.8.0 the API of inkan is frozen. Code written against a stable part keeps working, in
+meaning as well as in name, until the next major release. What is still finding its shape
+is marked experimental and says so in its types.
+
+## The policy
+
+- **Stable** exports are not removed and do not change meaning in a minor release.
+- **A rename or a removal** ships first as a deprecated alias: `@deprecated` in the types and
+  a one-time warning in development. The alias stays for **at least two minor releases and
+  at least six months**, and is only then removed, in a later minor, listed under "Removed"
+  in the CHANGELOG. Changing a default or a type in a way that breaks code follows the same
+  rule.
+- **Experimental** exports are marked `@experimental` and may change in any minor. The
+  CHANGELOG names every such change.
+- **Not API**: anything not exported from `@vxnsin/inkan` or `@vxnsin/inkan/client`,
+  anything named `_x`, and anything marked `@internal`.
+- **Security fixes** may break behaviour at once. They are announced in the CHANGELOG.
+- **Plugins** declare `inkan: ">=0.8.0 <1.0.0"`: from the minor they were built on up to the
+  next major (see [Publish a plugin](/docs/publish-a-plugin#say-which-inkan-it-works-with)).
+
+New members of the request context are announced a release ahead: the name is reserved first,
+and a [decoration](/docs/api/app#decorate) that already uses it gets a warning in development.
+Reserved now: `ctx.log` and `ctx.startedAt`. (`ctx.httpVersion` arrived in 0.8.0.)
+
+The whole public surface, as its types say it, is committed in the core repository as
+`api/inkan.d.ts.txt`. A test fails when the types change without that file being updated, so
+every change to the API shows up in review.
+
+## Stable
+
+| area | exports |
+| --- | --- |
+| the app | `inkan`, `App` (its public methods), `Scope`, `plugin`, `Plugin`, `PluginOptions`, `register`, `decorate`, `decorateRequest` (without options) |
+| hooks | `onRequest`, `preHandler`, `onSend`, `onResponse`, `onProblem` |
+| routes | `get`, `post`, `put`, `patch`, `delete`, `all`, `Routes`, `routes`, `mount`, `route`, `FileRoute`, `load` |
+| handlers | `reply`, `Reply`, `ReplyHeaders`, `Context`, `Handler`, `Middleware`, `RouteSpec`, `Responses`, `Example`, `Security`, `RouteInfo`, `RouteMeta`, `PathParams` |
+| schemas | `t`, `Schema`, `ValidationError`, `Infer`, `Issue`, `SafeResult`, `JsonSchema`, `UploadedFile` |
+| problems | `problem`, `HttpProblem`, `ProblemBody`, `ProblemOptions` |
+| streams | `sse`, `EventStream`, `SseEvent`, `ServerEvent` |
+| helpers | `html`, `raw`, `SafeHtml`, `parseCookies`, `serializeCookie`, `CookieOptions`, `CsvOptions`, `RedirectStatus` |
+| built-in middleware | `cors`, `rateLimit`, `serveStatic`, `compress` and their option types; `Origins`, `PreContext` |
+| servers and tests | `inject`, `InjectOptions`, `InjectResponse`, `listener`, `fetch`, `exchange`, `AdapterRequest`, `AdapterResponse`, `bodyFor`, `logRequest`, `listen`, `ListenOptions`, `RequestLog`, `RegisterOptions`, `joinPath` |
+| the rest | `Layout`, `TrustProxy`, `CacheRule`, `fileExample`, `env`, `Store`, `memoryStore` |
+| `@vxnsin/inkan/client` | `client`, `Client`, `ClientOptions`, `Answer`, `Input`, `Jsonify`, `StreamError` |
+
+## Experimental
+
+These work and are tested, and may still change in a minor release:
+
+- [jobs](/docs/jobs): `job`, the `Job*` types, the `schedule` option
+- [WebSockets](/docs/websocket): `ws`, the `Ws*` types, `client.ws`, `upgradeListener`, the app's `ws` option
+- `client.events`
+- [`pressure`](/docs/runtime#pressure-overload-protection): the option, `app.pressure()`, the `Pressure*` types
+- [`currentContext()`](/docs/runtime#currentcontext-the-request-anywhere) and the `context` option
+- [seals](/docs/seal): `seal`, `Seal`, `sealed()`
+- `decorateRequest` with options (`resolve`, `when`)
+- [`onOperation`](/docs/plugins#onoperation-adding-to-openapi), `OperationHook`, `OperationRoute`
+- the hook `order` option (`HookOptions`)
+- `workers`
+- `diffOpenAPI`, `formatDiff`, `Change`
+- [`check`](/docs/examples), `CheckOptions`, `CheckReport`, `CheckResult`, `formatReport`, `FormatOptions`, `partialMatch`
+- `PluginOptions.inkan`
+- [`around()`](/docs/plugins#around-wrapping-the-handler)
+- [`stateKey`](/docs/plugins#statekey-a-slot-of-your-own-in-ctxstate), `StateKey`
+
+## Deprecated in 0.8.0
+
+Each old name still works, warns once in development, and is shown struck through by your
+editor. Move to the new one at your pace: none goes sooner than two minor releases and six
+months after 0.8.0.
+
+| old | new |
+| --- | --- |
+| `scope.describe(fn)` | [`scope.onOperation(fn)`](/docs/plugins#onoperation-adding-to-openapi) |
+| `decorateRequest(…, { before: "handler" })` | [`decorateRequest(…, { resolve: "preHandler" })`](/docs/plugins#async-decorations) |
+| `onSend(fn, { last: true })` | [`onSend(fn, { order: "last" })`](/docs/plugins#hook-order-order-last) |
+| `register(plugin, { prefix })` | [`register(plugin, options, { prefix })`](/docs/api/app#register) |
+| a plugin reading `options.prefix` | [`scope.prefix`](/docs/plugins#dev-and-prefix) |
+| `app.job(path, { keep })`, in seconds | [`{ retain }`](/docs/jobs#options), in milliseconds |
+| `app.job(path, { every })` | [`{ schedule }`](/docs/jobs#on-a-schedule) |
+| route `cache: { seconds }` | [`cache: { ttl }`](/docs/api/routing#cache), in milliseconds |
+| the `wsOrigins` option, `WsOrigins` | [`ws: { origins }`](/docs/websocket#who-may-open-it-origins), `Origins` |
+| `cors({ origin })` | [`cors({ origins })`](/docs/built-in/cors) |
+| `app.use(cors())` | [`app.register(cors())`](/docs/built-in/cors) |
+| `context()` | [`currentContext()`](/docs/runtime#currentcontext-the-request-anywhere) |
+| `buildOpenAPI(routes)` | [`app.openapi()`](/docs/api/app#openapi-routes-sealed) |
+| `JobStore` | [`Store`](/docs/storage) |
+
+The official packages that took a store of their own (`@inkanjs/auth`, `@inkanjs/session`,
+`@inkanjs/idempotency`, all 0.2) take any [`Store`](/docs/storage) now, with TTLs in
+milliseconds where they were seconds. Their old exports are kept as deprecated re-exports:
+
+| old | new |
+| --- | --- |
+| `memoryStore` from `@inkanjs/auth`, `@inkanjs/session` or `@inkanjs/idempotency` | `memoryStore` from `@vxnsin/inkan` |
+| `Store`, `AuthStore` from `@inkanjs/auth`; `SessionStore`; `IdempotencyStore` | `Store` from `@vxnsin/inkan` |
+| a store of your own with TTLs in seconds | the same store with TTLs in milliseconds, or an [adapter](/docs/storage#choosing-an-adapter) |
+
+## Finding the old names
+
+In development, the first use of each old name prints one line, when the route, the plugin
+or the option is set up, never per request:
+
+```
+inkan: scope.describe() is deprecated, use scope.onOperation(). It keeps working until a later minor release removes it (see the CHANGELOG).
+inkan: cache: { seconds } is deprecated, use cache: { ttl } in milliseconds. It keeps working until a later minor release removes it (see the CHANGELOG).
+```
+
+With `NODE_ENV=production` nothing is printed. To find every one before a release:
+
+- **Run the app or its tests once in development.** `inkan check` loads the app the same way,
+  so it prints the warnings too: `npx inkan check src/app.ts 2>&1 | grep "is deprecated"`.
+- **Ask the types.** Every old name is `@deprecated`, so editors strike it through, and
+  typescript-eslint's `@typescript-eslint/no-deprecated` rule turns each use into a lint
+  error you can run in CI.
+- **Read the warning's name.** It says the old name and the new one, as in the table above.

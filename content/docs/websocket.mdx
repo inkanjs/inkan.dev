@@ -100,11 +100,12 @@ app.ws("/live", { origins: ["https://shop.example"] }, live);            // the 
 app.ws("/live", { origins: (origin, ctx) => origin?.endsWith(".shop.example") ?? true }, live); // decides alone
 app.ws("/public", { origins: "*" }, feed);                               // every page
 
-inkan({ wsOrigins: ["https://admin.shop.example"] });                    // for every route without its own
+inkan({ ws: { origins: ["https://admin.shop.example"] } });             // for every route without its own
 ```
 
-A function gets the request before hooks and input checks (headers, protocol, path), so it
-cannot read decorations. Origins are compared as URL origins: `http://X:80` is `http://x`.
+A function gets the request's Origin and a `PreContext`: the request before hooks and input
+checks (`method`, `path`, `headers`, `protocol`, `ip`), so it cannot read decorations. The
+same `Origins` type serves [`cors({ origins })`](/docs/built-in/cors). Origins are compared as URL origins: `http://X:80` is `http://x`.
 
 ## Options
 
@@ -113,12 +114,18 @@ cannot read decorations. Origins are compared as URL origins: `http://X:80` is `
 | `params`, `query`, `headers` | | checked on the upgrade request, as for a GET |
 | `message`, `send` | | the contracts, above |
 | `security`, `use`, `meta` | | as for any route: credentials, middleware, free-form meta |
-| `origins` | the app's `wsOrigins`, else the own origin | above |
+| `origins` | the app's `ws.origins`, else the own origin | above |
 | `maxMessage` | `1048576` (1 MiB) | bytes one message may have, fragments together; past it, 1009 |
 | `heartbeat` | `30000` | ms between pings; a peer that has not answered the last one by the next is cut off. `false` for none |
 | `maxConnections` | none | sockets this route holds at once, handshakes on the way counted; past it the upgrade is a 503 `too-many-connections` |
 | `handshakeTimeout` | `10000` | ms the upgrade request has to get its answer (hooks, security, middleware) before the connection is cut |
 | `summary`, `description`, `tags`, `operationId`, `deprecated`, `hidden` | | for the docs and OpenAPI |
+
+The app's `ws` option sets the defaults for every route that does not set its own:
+
+```ts
+inkan({ ws: { origins: ["https://admin.shop.example"], maxMessage: 64 * 1024, heartbeat: 15_000, handshakeTimeout: 5_000 } });
+```
 
 Before any hook, too: an upgrade that is not a GET over HTTP/1.1 without a body is a 400, and
 `sec-websocket-key` has to be canonical base64. A plain request to a WebSocket path is a 426.
@@ -143,12 +150,14 @@ Your own codes go from 4000 to 4999, as `socket.close(4000, "bye")` above.
   subprotocol is chosen either; a hook may set `sec-websocket-protocol`.
 - **Not on `app.fetch`.** Bun, Deno and serverless platforms upgrade their own way. `listen`
   listens for upgrades when the app has a WebSocket route; a server of your own takes
-  `server.on("upgrade", app.upgradeListener)`.
+  `server.on("upgrade", app.upgradeListener)`, and [@inkanjs/uws](/docs/integrations/uws)
+  runs them on uWebSockets.js.
 - **A message comes in at most 1024 frames**, each after the first counted 64 bytes against
   `maxMessage`; text is checked as UTF-8 frame by frame. A peer that floods pings without
   reading gets only its latest one answered.
 - **Per process.** With `workers`, each process holds its own sockets. Broadcast with a `Set`
-  of sockets per process, or through a bus the processes share (Redis pub/sub, say):
+  of sockets per process, or through a bus the processes share: the `publish`/`subscribe` of a shared
+  [`Store`](/docs/storage), Redis pub/sub, say:
 
 ```ts
 import type { Infer, WsSocket } from "@vxnsin/inkan";

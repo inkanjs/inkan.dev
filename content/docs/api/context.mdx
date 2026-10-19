@@ -37,14 +37,15 @@ schema cut `ctx.headers` down to its contract. For hooks and plugins that must s
 no route lists. It is the request's own object, not a copy: read it, do not change it. New
 in 0.7.0.
 
-## method, path, url
+## method, path, url, httpVersion
 
 ```ts
-({ method, path, url }) => `${method} ${path} on ${url.host}`
+({ method, path, url, httpVersion }) => `${method} ${path} on ${url.host} over HTTP/${httpVersion}`
 ```
 
 The request line. `url` is a `URL`, made only when it is read; its scheme is
-[`protocol`](#secure-protocol).
+[`protocol`](#secure-protocol). `httpVersion` is `"1.1"`, `"2.0"` or `"1.0"`, and `"1.1"`
+where the platform does not say (`app.fetch`). `httpVersion` is new in 0.8.0.
 
 ## secure, protocol
 
@@ -108,6 +109,20 @@ app.use(async (ctx, next) => {
 
 Free space for middleware to hand things on to the handler. For values that are the same on
 every request, a [decoration](/docs/api/app#decorate) is cheaper.
+
+```ts
+import { stateKey } from "@vxnsin/inkan";
+
+export const tenant = stateKey<Tenant>("tenant");
+
+app.onRequest((ctx) => tenant.set(ctx, lookUp(ctx)));
+app.get("/me", (ctx) => tenant.get(ctx)?.name); // typed: Tenant | undefined
+```
+
+`stateKey<T>(name)` is a typed slot in `ctx.state`, under a symbol of its own: two plugins
+that pick the same name never meet, no string key reaches it, and `ctx.state` stays a plain
+record for everyone else. Make it once, at the top of a module, and export it to whoever
+reads it. Experimental, new in 0.8.0.
 
 ## route
 

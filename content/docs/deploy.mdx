@@ -86,7 +86,7 @@ inkan({
   requestId: "x-request-id",      // or false
   gracefulShutdown: true,
   dev: process.env.NODE_ENV !== "production",
-  onError: (err, ctx) => report(err),
+  onError: (err, ctx) => report(err, ctx?.id), // ctx is undefined for an error outside any request
 });
 ```
 

@@ -16,7 +16,7 @@ const api = plugin((app) => {
 });
 
 export const app = inkan({ docs: "/api/docs", openapi: "/api/openapi.json", inspector: "/api/_inkan" })
-  .register(api, { prefix: "/api" });
+  .register(api, {}, { prefix: "/api" });
 ```
 
 The inspector only answers a loopback address. Pass `{ remote }` where the framework

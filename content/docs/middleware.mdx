@@ -55,13 +55,14 @@ origin, add `cors()`:
 ```ts
 import { cors } from "@vxnsin/inkan";
 
-app.use(cors());                                                  // any origin
-app.use(cors({ origin: "https://shop.example", credentials: true })); // one origin, with cookies
-app.use(cors({ origin: ["https://a.example", "https://b.example"], maxAge: 600 }));
-app.use(cors({ origin: (o) => o.endsWith(".shop.example") }));
+app.register(cors());                                                        // any origin
+app.register(cors({ origins: ["https://shop.example"], credentials: true }));  // one origin, with cookies
+app.register(cors({ origins: ["https://a.example", "https://b.example"], maxAge: 600 }));
+app.register(cors({ origins: (origin) => origin?.endsWith(".shop.example") ?? false }));
 ```
 
-Preflights are answered before routing, and error answers carry the headers
+`cors` is a shared plugin, so registered inside a plugin it covers only that plugin's
+routes. Preflights are answered before routing, and error answers carry the headers
 too, so the page can read a 404 instead of a CORS error. `allowHeaders`,
 `exposeHeaders` and `methods` are there when the defaults are not enough.
 

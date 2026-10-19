@@ -1,6 +1,6 @@
 ---
 title: "Running in production"
-description: "env() for the configuration, pressure for overload, context() for code far from the handler."
+description: "env() for the configuration, pressure for overload, currentContext() for code far from the handler."
 ---
 
 Three things an app needs once it runs for real, each off until you ask for it.
@@ -67,29 +67,29 @@ any hook, the log and the inspector. inkan's own pages and the `exempt` paths st
 `reason` (`"eventLoopDelay"`, `"heapUsed"`, `"rss"` or `"check"`), and the numbers it read.
 Without the option it is `undefined`, there is no timer, and a request reads nothing for it.
 
-## context(): the request, anywhere
+## currentContext(): the request, anywhere
 
 ```ts
-import { context, inkan } from "@vxnsin/inkan";
+import { currentContext, inkan } from "@vxnsin/inkan";
 
 const app = inkan({ context: true });
 
 export function log(message: string) {
-  console.log(`[${context()?.id ?? "-"}] ${message}`); // no ctx passed down
+  console.log(`[${currentContext()?.id ?? "-"}] ${message}`); // no ctx passed down
 }
 ```
 
 With `context: true`, each request runs inside an `AsyncLocalStorage` holding its context,
 so code far from the handler (a logger, a database helper three calls down) reads
-`context()?.id` or `context()?.user` without having it passed. Concurrent requests never see
+`currentContext()?.id` or `currentContext()?.user` without having it passed. Concurrent requests never see
 each other's.
 
-- **Outside a request** (at startup, in a timer started outside one) `context()` is
+- **Outside a request** (at startup, in a timer started outside one) `currentContext()` is
   `undefined`. With no app in the process that turned it on, it throws: it could only ever
   hand back `undefined`.
 - **Jobs** run with their own `job.ctx`, never inside the store of the request that started
   them, and timers inkan makes during a request do not keep that store either.
-- **Typed** by what you say: `context<Context & { user: User }>()`.
+- **Typed** by what you say: `currentContext<Context & { user: User }>()`.
 - **The cost.** Off by default, and then a request pays nothing. On, it costs about
   0.5-1 µs a request: 113 % of the time without it in `bench/inproc.mjs` (geomean), 10-25 %
   on the smallest requests, a few % where a request does real work. Passing `ctx` along is

@@ -6,28 +6,36 @@ description: "Lets pages on other origins call the API."
 ```ts
 import { cors } from "@vxnsin/inkan";
 
-app.use(cors({ origin: "https://shop.example", credentials: true }));
+app.register(cors({ origins: ["https://shop.example"], credentials: true }));
 ```
 
 Answers preflight requests and puts the `access-control-*` headers on every answer, so a
-page on another origin may call the API from the browser. Use it on the app for every
-route, or on a group made with `routes()` for some of them.
+page on another origin may call the API from the browser. It is a shared plugin:
+`app.register(cors(…))` covers every route of the app, `scope.register(cors(…))` inside a
+plugin only the routes of that scope. Preflights to a path without an OPTIONS route of its
+own are answered too.
 
 ## Options
 
 | option | default | |
 | --- | --- | --- |
-| `origin` | `"*"` | which origins may call: one, a list, or a function `(origin) => boolean` |
+| `origins` | `"*"` | which origins may call: `"*"`, a list, or a function `(origin, ctx) => boolean` |
 | `credentials` | `false` | lets the browser send cookies and auth headers; the origin is then echoed instead of `*`, with `vary: origin` |
 | `maxAge` | | seconds the browser may reuse a preflight answer |
 | `methods` | every method inkan routes | the methods a preflight allows |
 | `allowHeaders` | whatever the browser asks for | the request headers a preflight allows |
 | `exposeHeaders` | | response headers the page may read besides the simple ones |
 
+`origins` is the same `Origins` type [WebSockets](/docs/websocket#who-may-open-it-origins)
+take. A function gets the request's Origin header and a `PreContext` (`method`, `path`,
+`headers`, `protocol`, `ip`): the request as it arrived, before any hook. A request without
+an Origin is no cross-origin call and gets no CORS headers, so the function is only asked
+about one with an Origin.
+
 ## Examples
 
 ```ts
-app.use(cors({ origin: ["https://shop.example", "https://admin.shop.example"] }));
-app.use(cors({ origin: (o) => o.endsWith(".shop.example"), maxAge: 600 }));
-app.use(cors({ exposeHeaders: ["x-request-id"] }));
+app.register(cors({ origins: ["https://shop.example", "https://admin.shop.example"] }));
+app.register(cors({ origins: (origin) => origin?.endsWith(".shop.example") ?? false, maxAge: 600 }));
+app.register(cors({ exposeHeaders: ["x-request-id"] }));
 ```

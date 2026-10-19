@@ -110,7 +110,7 @@ is aborted, so a database query behind it can stop. The app's `timeout` is the d
 ## cache
 
 ```ts
-app.get("/stock/:id", { params, cache: { seconds: 600 } }, ({ params }) => stock(params.id));
+app.get("/stock/:id", { params, cache: { ttl: 600_000 } }, ({ params }) => stock(params.id));
 ```
 
 Keeps the handler's answers: the same params and query within the time get the same answer
@@ -119,7 +119,7 @@ that one answer instead of each asking the database again.
 
 | option | default | |
 | --- | --- | --- |
-| `seconds` | | how long an answer is kept |
+| `ttl` | | milliseconds an answer is kept |
 | `shared` | `false` | the same for everybody; otherwise the authorization and cookie headers are part of the key, so one user never gets another's answer |
 | `max` | 1000 | answers kept per route; past it the oldest goes |
 

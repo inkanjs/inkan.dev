@@ -17,7 +17,7 @@ const PACKAGE = `// package.json
   "description": "One line: what it does.",
   "keywords": ["inkan", "inkan-plugin"],
   "peerDependencies": {
-    "@vxnsin/inkan": ">=0.7.0"
+    "@vxnsin/inkan": ">=0.8.0 <1.0.0"
   }
 }`;
 

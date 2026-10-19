@@ -29,6 +29,13 @@ first: any status can also come from a proxy on the way, so `status` alone canno
 which answer it is. The client is a few lines around `fetch` and runs anywhere fetch does;
 pass your own with `{ fetch }`.
 
+```ts
+const res = await shop.get("/teas/:id", { params: { id: 1 }, signal: AbortSignal.timeout(5000) });
+```
+
+Every call takes a `signal`: `AbortSignal.timeout(ms)`, or a controller's to cancel it when
+the user moves on. New in 0.8.0.
+
 Routes written one statement at a time (`app.get(...);`) work as always, but their type
 cannot collect them: a type only grows along a chain.
 
@@ -60,6 +67,22 @@ for await (const m of room) if (m.type === "said") show(m.text); // typed by its
 `ws(path, { params, query, headers })` opens a route made with [`app.ws`](/docs/websocket)
 with the platform's `WebSocket`. Leaving a `for await` loop closes it; `headers` go with the
 upgrade only in Node. New in 0.7.0.
+
+## Live data in a component
+
+```tsx
+import { queries } from "@inkanjs/query";
+import { useEvents, useSocket } from "@inkanjs/query/react";
+
+const q = queries(shop);
+const feed = useEvents(q.events("/teas/:id/events", { params: { id } }));   // feed.last, feed.byName.brewed
+const room = useSocket(q.ws("/rooms/:room", { params: { room } }));         // room.send(...), room.last
+```
+
+[@inkanjs/query](/docs/integrations/query#live-data-events-and-websockets) turns `events`
+and `ws` into React hooks that open on mount, open again when the path or input changes, and
+close on unmount, typed from the same contracts. `follow` and `connect` do the same without
+React, for Vue, Svelte or Solid.
 
 ## Routes out of plugins
 

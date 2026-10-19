@@ -1,0 +1,123 @@
+---
+title: "Redis store"
+description: "@inkanjs/redis: an inkan Store in Redis, on your node-redis or ioredis client. Jobs, rate limits, logins and sessions shared by every process."
+---
+
+<Callout title="New with inkan 0.8">
+  `@inkanjs/redis` 0.1 needs inkan 0.8.0 or newer, below 1.0. It is a [`Store`](/docs/storage):
+  what it guarantees, and how it compares with the other adapters, is on the Storage page.
+</Callout>
+
+A Redis `Store` for inkan: background jobs, sessions,
+logins, idempotency keys and rate limits kept in Redis, so every process and every server
+of an app sees the same state. It runs on the Redis client you already have, `redis`
+(node-redis v4 or later) or `ioredis`, and has no dependencies of its own.
+
+```sh
+npm install @vxnsin/inkan @inkanjs/redis redis   # or ioredis
+```
+
+```ts notwoslash
+import { inkan, rateLimit } from "@vxnsin/inkan";
+import { createClient } from "redis";
+import { redisStore } from "@inkanjs/redis";
+
+const client = createClient({ url: process.env.REDIS_URL });
+await client.connect();
+const store = redisStore(client); // or redisStore(new Redis(url)) with ioredis
+
+const app = inkan({ workers: "auto" })
+  .register(rateLimit({ max: 100, window: 60_000, store }))
+  .job("/exports", { store }, async (job) => buildExport(job));
+```
+
+One store serves everything that keeps state; each part keeps its keys apart by a prefix of
+its own:
+
+```ts notwoslash
+import { session } from "@inkanjs/session";
+import { auth } from "@inkanjs/auth";
+import { idempotency } from "@inkanjs/idempotency";
+
+app
+  .register(session({ secret, store }))
+  .register(auth({ /* … */ store }))
+  .register(idempotency({ store }));
+```
+
+With `workers`, inkan refuses jobs kept in memory; this store is `shared: true`, so jobs run
+in any worker, and progress and cancels reach the others through publish/subscribe.
+
+## Options
+
+`redisStore(client, options?)`
+
+| option | default | |
+| --- | --- | --- |
+| `prefix` | `"inkan:"` | put in front of every key and channel; give two apps on one server their own |
+| `subscriber` | `client.duplicate()` | the connection SUBSCRIBE runs on; made at the first `subscribe`, closed by `close()`. One you pass is yours to open and close |
+
+`store.close()` closes only the subscriber connection the store made. The client you passed
+in stays open: quit it yourself when the app stops.
+
+## What it sends
+
+| method | Redis |
+| --- | --- |
+| `get` | `GET` |
+| `set` | `SET key json PX ttl`, or plain `SET`, which clears an old TTL |
+| `delete` | `DEL` |
+| `add` | `SET key json NX [PX ttl]` |
+| `take` | `GETDEL`; on a server before 6.2 a Lua `GET` + `DEL` instead |
+| `increment` | one Lua script: `INCRBY` (`INCRBYFLOAT` for a fraction), `PEXPIRE` only when the key was not there |
+| `publish` | `PUBLISH prefix+channel json` |
+| `subscribe` | `SUBSCRIBE` on the second connection, one per channel however many listeners |
+
+The client is told apart by its methods: `call` is ioredis, `sendCommand` node-redis. Any
+other object is refused.
+
+## Guarantees
+
+- `add`, `take` and `increment` are each one atomic step on the server, so they hold
+  across every process and every server that uses the same Redis and prefix.
+- A key with a TTL is gone once it is over (Redis expires keys to the millisecond). TTLs are
+  rounded up to whole milliseconds, never down, so a key never goes early.
+- `increment` gives a key that was not there (or whose TTL was over) the TTL, and keeps
+  the TTL of one that was: a rate-limit window stays fixed.
+- Values are JSON: `get` returns what `JSON.stringify` made of the value, `undefined` for a
+  missing key, `null` only for a stored `null`.
+- The suite from `@vxnsin/inkan/testing` (`storeConformance`, see [writing an adapter](/docs/storage#writing-an-adapter)) passes on both clients.
+
+## Limits
+
+- **Publish/subscribe is Redis Pub/Sub:** at most once, nothing kept. A message published
+  while a subscriber is reconnecting is lost. inkan's jobs live with that (the job record
+  in the store is the truth, messages only make others hear sooner).
+- `increment` on a key whose value is not a JSON number (a string, even `"5"`, a boolean,
+  `null`, an object) rejects with a `TypeError` and leaves the value as it was, as the other
+  stores do.
+- Redis Cluster works with ioredis' `Cluster` and node-redis' `createCluster` as far as the
+  commands go (every command touches one key), but is not tested here.
+- Memory: keys without a TTL stay until deleted. Set `maxmemory-policy` with that in mind;
+  `volatile-*` policies only ever evict keys that have a TTL.
+
+## Security
+
+- **Whoever can write to the Redis, under the prefix, writes your state**: sessions, refresh
+  tokens, job records, login counters. Treat the store like the database of your users. Use
+  Redis ACLs and a password, TLS (`rediss://`) when it is not on the same host, and never
+  expose it to the internet. A `prefix` keeps two apps from meeting by accident; it is no
+  boundary between people who distrust each other: give those a Redis (or an ACL) each.
+- **No key or value becomes a command.** Keys and values go as arguments of their command;
+  the two Lua scripts are fixed text that takes the key as `KEYS[1]`. A key with `*`,
+  `:` or spaces is only ever that key.
+- **Values are read back with `JSON.parse`** alone, no reviver: what comes back is data, never
+  code or a class instance.
+- **TTLs are checked**: a TTL must be a finite number of milliseconds, more than 0 and at most
+  ten years, or the call throws (a `TypeError` or `RangeError`). A bad duration cannot turn
+  into a key that never expires.
+- **Messages are not signed.** Anyone who can `PUBLISH` on the Redis can send a job's
+  progress or a cancel to the app; that is the same trust as writing its keys.
+- **`increment` counts numbers only.** On a key whose value is not a JSON number (a string,
+  even `"5"`, a boolean, `null`, an object) it rejects with a `TypeError` and leaves the value
+  as it was, so a counter cannot be reset by writing text over it.

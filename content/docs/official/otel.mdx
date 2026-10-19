@@ -3,8 +3,8 @@ title: "OpenTelemetry"
 description: "A SERVER span for every request, named by its route, continued from the caller's traceparent."
 ---
 
-<Callout title="Needs inkan 0.7">
-  `@inkanjs/otel` needs inkan 0.7.0 or newer.
+<Callout title="Needs inkan 0.8">
+  `@inkanjs/otel` needs inkan 0.8.0 or newer, below 1.0.
 </Callout>
 
 ```sh
@@ -80,7 +80,8 @@ app.get("/teas/:id", (ctx) =>
 ```
 
 A thrown error reaches the span as a problem only (`internal`): inkan keeps the error itself
-for `onError`. Record it there with `spanOf`:
+for `onError`. Record it there with `spanOf`, which takes the `ctx` `onError` gets, `undefined` too (an
+error from outside any request has no span):
 
 ```ts
 import { spanOf } from "@inkanjs/otel";

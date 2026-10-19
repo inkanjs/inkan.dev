@@ -3,7 +3,7 @@
 // An entry here is for a better line, tags or a docs link: add it under "community" in a pull request.
 // See /docs/publish-a-plugin.
 
-export type HankoKind = "built-in" | "middleware" | "integration" | "recipe" | "community";
+export type HankoKind = "built-in" | "middleware" | "store" | "integration" | "recipe" | "community";
 
 export type Hanko = {
   /** the package name, or what you write in code for a built-in */
@@ -34,6 +34,7 @@ export type Hanko = {
 export const KINDS: { kind: HankoKind; label: string; note: string }[] = [
   { kind: "built-in", label: "built-in", note: "In the core. Nothing to install, nothing to keep in step." },
   { kind: "middleware", label: "middleware", note: "Official packages under @inkanjs, each a shared plugin." },
+  { kind: "store", label: "stores", note: "One Store for jobs, rate limits, logins and sessions, shared by every process. On your own client." },
   { kind: "integration", label: "integrations", note: "inkan where you already are. One package each." },
   { kind: "recipe", label: "recipes", note: "Not packages: a few lines of your own, on the driver you already use." },
   { kind: "community", label: "community", note: "Written by others, listed here, maintained by their authors." },
@@ -150,10 +151,10 @@ export const hanko: Hanko[] = [
     tags: ["websocket", "realtime", "chat", "client"],
   },
   {
-    name: "every",
+    name: "schedule",
     description: "Jobs on a cron schedule: five fields, names, Vixie's day rule, UTC or local, one worker runs them.",
     kind: "built-in",
-    href: "/docs/jobs#on-a-schedule-every",
+    href: "/docs/jobs#on-a-schedule",
     repo: CORE,
     since: "0.7.0",
     tags: ["cron", "schedule", "jobs", "background"],
@@ -178,14 +179,24 @@ export const hanko: Hanko[] = [
     tags: ["overload", "503", "health", "event loop"],
   },
   {
-    name: "context()",
+    name: "currentContext()",
     description: "The request's context anywhere, through AsyncLocalStorage: in a logger, in a database helper.",
     kind: "built-in",
-    href: "/docs/runtime#context-the-request-anywhere",
+    href: "/docs/runtime#currentcontext-the-request-anywhere",
     repo: CORE,
-    code: `import { context } from "@vxnsin/inkan"`,
+    code: `import { currentContext } from "@vxnsin/inkan"`,
     since: "0.7.0",
     tags: ["asynclocalstorage", "logging", "tracing", "request"],
+  },
+  {
+    name: "memoryStore",
+    description: "The Store inkan has built in: TTLs, atomic add, take and increment, LRU-bounded. One process.",
+    kind: "built-in",
+    href: "/docs/storage#memorystore",
+    repo: CORE,
+    code: `import { memoryStore } from "@vxnsin/inkan"`,
+    since: "0.8.0",
+    tags: ["store", "cache", "ttl", "jobs", "sessions"],
   },
   {
     name: "cache",
@@ -302,6 +313,48 @@ export const hanko: Hanko[] = [
     repo: MIDDLEWARE,
     since: "0.7.0",
     tags: ["opentelemetry", "tracing", "observability", "spans"],
+  },
+
+  /* ---------- stores ---------- */
+  {
+    name: "@inkanjs/redis",
+    description: "A Store in Redis on your node-redis or ioredis client: SET NX, GETDEL, Pub/Sub for jobs.",
+    kind: "store",
+    href: "/docs/official/redis",
+    npm: "@inkanjs/redis",
+    repo: MIDDLEWARE,
+    since: "0.8.0",
+    tags: ["redis", "ioredis", "store", "rate limit", "sessions", "workers"],
+  },
+  {
+    name: "@inkanjs/postgres",
+    description: "A Store in one PostgreSQL table on your pg or postgres.js: the database's clock, LISTEN/NOTIFY for jobs.",
+    kind: "store",
+    href: "/docs/official/postgres",
+    npm: "@inkanjs/postgres",
+    repo: MIDDLEWARE,
+    since: "0.8.0",
+    tags: ["postgresql", "pg", "sql", "store", "database", "workers"],
+  },
+  {
+    name: "@inkanjs/mongo",
+    description: "A Store on MongoDB with your own client: atomic commands, a TTL index, change streams or polling.",
+    kind: "store",
+    href: "/docs/official/mongo",
+    npm: "@inkanjs/mongo",
+    repo: MIDDLEWARE,
+    since: "0.8.0",
+    tags: ["mongodb", "nosql", "store", "database", "workers"],
+  },
+  {
+    name: "@inkanjs/mysql",
+    description: "A Store on MySQL 8 with your mysql2 pool: exact binary keys, prepared statements, the database's clock.",
+    kind: "store",
+    href: "/docs/official/mysql",
+    npm: "@inkanjs/mysql",
+    repo: MIDDLEWARE,
+    since: "0.8.0",
+    tags: ["mysql", "sql", "store", "database", "workers"],
   },
 
   /* ---------- integrations ---------- */
