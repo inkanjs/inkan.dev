@@ -83,8 +83,7 @@ export default function Benchmarks() {
           <div>
             <h2 className="font-mono text-2xl font-extrabold">A range, not a rank</h2>
             <p className="mt-4 text-soft">
-              A run on another day moves each server by a few points. On node:http inkan was ahead of Fastify in each of the
-              three runs of the 0.7.0 bench, on average; not in every scenario, though: Fastify still leads the async handler. inkan also does a bit more per
+              A run on another day moves each server by a few points. On node:http inkan is level with Fastify or a little ahead: in front in two of the three runs of the 0.8.0 bench, level in the third, and not in every scenario. inkan also does a bit more per
               request than the others: an id for every request, and every key an answer&apos;s contract does not list kept
               back.
             </p>
