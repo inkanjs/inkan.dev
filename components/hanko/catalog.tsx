@@ -50,6 +50,7 @@ function Kind({ kind }: { kind: HankoKind }) {
   const look = {
     "built-in": "border-seal bg-seal text-[#fbf1e6]",
     middleware: "border-hot/60 text-hot",
+    store: "border-hot/40 text-hot/80",
     integration: "border-soft/50 text-soft",
     recipe: "border-dotted border-soft/60 text-soft",
     community: "border-dashed border-muted text-muted",

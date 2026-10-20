@@ -13,7 +13,7 @@ const PICK = [
   "@inkanjs/session",
   "app.job",
   "@inkanjs/secure-headers",
-  "every",
+  "schedule",
   "@inkanjs/etag",
   "env",
   "@inkanjs/idempotency",
@@ -21,7 +21,7 @@ const PICK = [
   "@inkanjs/proxy",
   "cache",
   "@inkanjs/circuit-breaker",
-  "context()",
+  "@inkanjs/redis",
   "@inkanjs/otel",
   "@inkanjs/next",
 ];
@@ -36,7 +36,7 @@ const short = (name: string) =>
     .split("-")
     .flatMap((part, i) => (i ? [<wbr key={i} />, "-" + part] : [part]));
 
-const COUNTED: HankoKind[] = ["built-in", "middleware", "integration", "recipe"];
+const COUNTED: HankoKind[] = ["built-in", "middleware", "store", "integration"];
 
 export function Hanko() {
   const ref = useRef<HTMLDivElement>(null);
@@ -52,7 +52,7 @@ export function Hanko() {
             Stamps for the rest <span className="text-muted">判子</span>
           </h2>
           <p className="mt-4 text-soft">
-            Login, sessions, websockets, jobs on a schedule, a proxy, tracing. What does not belong in every app comes as a
+            Login, sessions, websockets, jobs on a schedule, a proxy, tracing, a store in Redis or Postgres. What does not belong in every app comes as a
             stamp you press onto it: one line to register, typed all the way to the client, and listed in your docs.
           </p>
           <dl className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">

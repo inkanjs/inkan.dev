@@ -24,7 +24,7 @@ npx @vxnsin/inkan create plugin @you/inkan-tenant pkg # a scoped name, into ./pk
 index.js          the plugin, plain JavaScript: no build step, what you test is what npm installs
 index.d.ts        its types, so ctx.tenant is typed after register
 test.ts           node --test on app.inject: no port, no network
-package.json      the name, the inkan-plugin keyword, inkan as a peer for the minor that runs
+package.json      the name, the inkan-plugin keyword, inkan as a peer, up to the next major
 README.md         install, the smallest example, the options
 tsconfig.json     for npm run typecheck
 LICENSE           MIT
@@ -33,7 +33,7 @@ LICENSE           MIT
 ```
 
 The example plugin asks every request for a header, answers 400 without it, puts it on
-`ctx.tenant` and writes the header into OpenAPI with `describe()`: replace it, keep the
+`ctx.tenant` and writes the header into OpenAPI with `onOperation()`: replace it, keep the
 shape. The function is named after the package (`inkan-tenant` → `tenant`). It refuses a
 name npm would not take, the `@inkanjs` scope, and a folder that is already there.
 Everything below is what the template does for you, and why.
@@ -56,7 +56,7 @@ Name it after what it does, not after inkan: `inkan-tenant`, not `inkan-plugin-t
   "keywords": ["inkan-plugin"],
   "type": "module",
   "peerDependencies": {
-    "@vxnsin/inkan": ">=0.7.0 <0.8.0"
+    "@vxnsin/inkan": ">=0.8.0 <1.0.0"
   }
 }
 ```
@@ -64,8 +64,10 @@ Name it after what it does, not after inkan: `inkan-tenant`, not `inkan-plugin-t
 - **The keyword `inkan-plugin`** is how a plugin is found on npm, Hanko or not.
 - **inkan is a peer dependency**, never a dependency. The app brings its own inkan; a second
   copy in your package would give it a second `t`, a second `problem` and types that do not
-  line up. The template puts in the minor you build and test on; widen it once you have
-  tested against more.
+  line up. From 0.8.0 the stable API does not break within a major (see
+  [Stability](/docs/stability)), so the template declares `>=0.8.0 <1.0.0`: from the minor you
+  build on up to the next major. Lean on [experimental](/docs/stability#experimental) parts
+  and you may want a narrower range.
 
 ## Say which inkan it works with
 
@@ -79,7 +81,7 @@ export const tenant = (o: { header: string }) =>
   plugin((app) => app.decorateRequest("tenant", (ctx) => ctx.rawHeaders[o.header]), {
     shared: true,
     name: "inkan-tenant",
-    inkan: ">=0.7.0 <0.8.0",
+    inkan: ">=0.8.0 <1.0.0",
   });
 ```
 
@@ -87,7 +89,7 @@ On any other version `register()` throws, so a plugin built against one inkan do
 half-work on another:
 
 ```
-inkan-tenant needs inkan >=0.7.0 <0.8.0, this app runs 0.9.1
+inkan-tenant needs inkan >=0.8.0 <1.0.0, this app runs 1.0.0
 ```
 
 Ranges read as npm reads them: `^`, `~`, `0.7.x`, `<`, `>=`, hyphens, spaces and `||`. A
@@ -103,7 +105,7 @@ dependency's. `PluginOptions` is exported for the options' type.
   `ctx.tenant` is typed after `register` with no generics to write. See
   [typed decorations](/docs/plugins#typed-decorations-out-of-shared-plugins).
 - **Honest in the OpenAPI document.** A plugin that adds a header, an answer or a security
-  scheme says so with [`describe()`](/docs/plugins#describe-adding-to-openapi). Then `/docs`
+  scheme says so with [`onOperation()`](/docs/plugins#onoperation-adding-to-openapi). Then `/docs`
   shows the 401 your plugin can send.
 - **Tested with `app.inject`.** No port, no network: build a small app, register the plugin,
   inject requests.

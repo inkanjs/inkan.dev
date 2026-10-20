@@ -1,0 +1,200 @@
+---
+title: "Storage"
+description: "One Store for everything that keeps state: jobs, rate limits, logins, sessions and idempotency keys, in memory or shared."
+---
+
+Some parts of an app remember things between requests: a job and its progress, how many
+requests a client made this minute, a session, a refresh token, the answer to an
+idempotency key. In inkan all of them keep it in one kind of thing, a `Store`. In one process
+the built-in `memoryStore()` is all you need. Behind several processes or servers, hand every
+part the same shared store, from Redis or the database you already run, and they all see the
+same state.
+
+```ts notwoslash
+import { inkan, rateLimit } from "@vxnsin/inkan";
+import { redisStore } from "@inkanjs/redis";
+import { session } from "@inkanjs/session";
+
+const store = redisStore(redis); // your own client, connected
+
+const app = inkan({ workers: "auto" })
+  .register(rateLimit({ max: 100, store }))
+  .register(session({ secret, store }))
+  .job("/exports", { store }, buildExport);
+```
+
+Each part keeps its keys apart by a prefix of its own, so one store serves them all. New in
+0.8.0.
+
+## The Store interface
+
+```ts notwoslash
+import type { Store } from "@vxnsin/inkan";
+
+interface Store {
+  get<T = unknown>(key: string): Promise<T | undefined>;
+  set(key: string, value: unknown, ttl?: number): Promise<void>;
+  delete(key: string): Promise<void>;
+  add(key: string, value: unknown, ttl?: number): Promise<boolean>;    // set if absent: atomic
+  take<T = unknown>(key: string): Promise<T | undefined>;               // get and delete: atomic
+  increment(key: string, by?: number, ttl?: number): Promise<number>;   // count: atomic
+  publish?(channel: string, message: unknown): Promise<void>;
+  subscribe?(channel: string, fn: (message: unknown) => void): Promise<() => void>;
+  readonly shared?: boolean;
+}
+```
+
+| method | does |
+| --- | --- |
+| `get(key)` | the value, or `undefined` when there is none or its TTL is over |
+| `set(key, value, ttl?)` | keeps the value, replacing what was there and its TTL; without a TTL the key stays |
+| `delete(key)` | forgets the key; one that is not there is fine |
+| `add(key, value, ttl?)` | keeps the value only when the key is free, and says whether it did |
+| `take(key)` | reads and removes the key in one step |
+| `increment(key, by = 1, ttl?)` | adds to the number and returns the new one; a new key starts at 0 and gets the TTL, an existing one keeps its TTL |
+| `publish(channel, message)` | sends a JSON message to every subscriber of the channel |
+| `subscribe(channel, fn)` | calls `fn` with every message until the function it resolves to is called |
+| `shared` | whether several processes see the same keys |
+
+### What every store guarantees
+
+- **Keys** are opaque strings, any characters (`:`, `*`, `%`, `_`, spaces, unicode). Two
+  keys are the same only when they are equal; none is a pattern or a prefix of another.
+- **Values are JSON.** What `get` returns equals the value after a trip through
+  `JSON.stringify`: a `Date` comes back as a string, `undefined` properties are gone.
+  `undefined` is what `get` and `take` return for a missing key, never `null`; `null` is
+  only ever a stored `null`.
+- **TTLs are in milliseconds**, and optional. A key is never gone before its TTL, and never
+  returned once its TTL is over by a second or more, so a store that counts in whole seconds
+  rounds up.
+- **`add`, `take` and `increment` are atomic** across every process that shares the store:
+  of fifty `add`s on one key at once exactly one wins, of fifty `take`s exactly one gets the
+  value, and fifty `increment`s count to fifty.
+- **`publish` and `subscribe`** are both there or both missing. A message reaches every
+  subscriber of its channel in every process, at most once, in the order one process
+  published it. A message published while nobody listens is lost.
+- **`shared: true`** means several processes see the same keys. inkan refuses to run jobs
+  with `workers` on a store that is not.
+
+These guarantees are what the parts of inkan build on: a refresh token used once, a login
+counter that counts every parallel guess, an idempotency key that only one process runs.
+
+## memoryStore
+
+```ts
+import { memoryStore } from "@vxnsin/inkan";
+
+const store = memoryStore({ max: 50_000 });
+```
+
+The `Store` inkan has built in, in this process's memory: fast, gone when the process ends,
+not seen by other workers (`shared: false`).
+
+| option | default | |
+| --- | --- | --- |
+| `max` | `10000` | keys kept at most; past that the one used longest ago goes first |
+| `clock` | `Date.now` | the time in milliseconds, for tests |
+
+TTLs are checked as keys are read, and expired keys are dropped once a minute on a write.
+`add`, `take` and `increment` are atomic in the process, and `publish` reaches the process's
+own subscribers at once. Values are kept as they are given, not copied: do not change one
+after setting it.
+
+## What uses a store
+
+| part | where it takes one | what it keeps | needs |
+| --- | --- | --- | --- |
+| [jobs](/docs/jobs#where-jobs-are-kept) | `app.job(path, { store })` | one key per job, forgotten `retain` ms after it ends | `shared` with `workers`; `publish`/`subscribe` to hear progress and cancels at once |
+| [`rateLimit`](/docs/built-in/rate-limit) | `rateLimit({ store, prefix })` | one counter per client and window | `increment` |
+| [`@inkanjs/auth`](/docs/official/auth#store) | `store`, `session.store`, `bruteForce.store` | sessions, refresh tokens, TOTP steps, failed logins | `add`, `take`, `increment` |
+| [`@inkanjs/session`](/docs/official/session) | `store` | one record per session | `get`, `set`, `delete` |
+| [`@inkanjs/idempotency`](/docs/official/idempotency#store) | `store` | the first answer to a key | `add` |
+
+Without a store each of them keeps its state in a `memoryStore()` of its own.
+
+## Choosing an adapter
+
+Four official adapters implement `Store` on what you probably run already. Each takes your
+own client, has no dependencies, and passes the [conformance suite](#writing-an-adapter).
+
+| | [Redis](/docs/official/redis) | [PostgreSQL](/docs/official/postgres) | [MongoDB](/docs/official/mongo) | [MySQL](/docs/official/mysql) |
+| --- | --- | --- | --- | --- |
+| package | `@inkanjs/redis` | `@inkanjs/postgres` | `@inkanjs/mongo` | `@inkanjs/mysql` |
+| client | `redis` (v4+) or `ioredis` | `pg` or `postgres` | `mongodb` | `mysql2` pool |
+| TTL | Redis expires keys, to the ms | `expires_at` on the database's clock; expired rows swept every minute | a TTL index; never read after its TTL, deleted within about a minute | `DATETIME(3)` on the database's UTC clock; expired rows swept every minute |
+| atomicity | `SET NX`, `GETDEL`, one Lua script | one statement each, on a row lock | one `findOneAnd…` command each | `INSERT IGNORE`, transactions; deadlocks retried |
+| pub/sub | Redis Pub/Sub: milliseconds | `LISTEN`/`NOTIFY`: milliseconds, messages under 8000 bytes | change streams: milliseconds; without a replica set polled, up to ~1 s | polled, up to ~1 s |
+| needs | Redis; 6.2+ for `GETDEL` (a Lua script before) | a connection kept for `LISTEN`; not behind PgBouncer in transaction mode | MongoDB 4.4+; a replica set for change streams | MySQL 8.0+; not MariaDB |
+| best for | many increments a second, rate limits, fast fan-out | an app that runs on Postgres and wants no second system | an app on MongoDB | an app on MySQL |
+
+All four are `shared: true` and have `publish`/`subscribe`, so they carry jobs across
+`workers` and servers. The SQL and MongoDB stores decide expiry by the database's clock, so
+app servers whose clocks disagree still agree on what is over. Every call is a round trip:
+for thousands of increments a second, Redis is the better store.
+
+## Workers and several servers
+
+`memoryStore()` lives in one process. Run more than one, with `workers` or behind a load
+balancer, and each process has its own:
+
+- **Jobs** are refused: with `workers`, `listen()` throws for a job on a store that is not
+  `shared`, since the request to follow or cancel a job could land on a process that never
+  heard of it. With a shared store any worker answers, and progress and cancels reach the
+  others through `publish`/`subscribe`.
+- **Rate limits** count per process: four workers let four times `max` through. Give
+  `rateLimit` the shared store and they count together.
+- **Logins, sessions and idempotency keys** live where they were made. A session made in
+  one worker is unknown to the next; a refresh token or an idempotency key could be used
+  once per process. Give each the shared store.
+
+The same store and prefix on every server is all it takes for several servers to agree. Two
+apps on one Redis or one table keep apart by the adapter's `prefix`.
+
+## Writing an adapter
+
+A store of your own (another database, a cloud key-value service) implements the interface
+above and proves it with the conformance suite from `@vxnsin/inkan/testing`:
+
+```ts notwoslash
+// store.test.ts
+import { randomUUID } from "node:crypto";
+import { storeConformance } from "@vxnsin/inkan/testing";
+import { myStore } from "./index.ts";
+
+storeConformance(() => myStore(client, { prefix: `test:${randomUUID()}:` }), {
+  close: (store) => store.close(),
+});
+```
+
+```sh
+node --test store.test.ts
+```
+
+It registers `node:test` cases every `Store` must pass: every method there, and
+`publish`/`subscribe` both or neither; get, set and delete; JSON values of every kind coming
+back as they went in; look-alike keys (`user:1`, `user:10`, `user*`, `user%`, `USER`) kept
+apart; two stores from `make` not seeing each other's keys; `add`, `take` and `increment`
+under fifty concurrent calls; TTLs (`set` replaces one, `increment` keeps the first); and
+publish/subscribe in order, until unsubscribed, when the store has them.
+
+| option | default | |
+| --- | --- | --- |
+| `name` | `"Store conformance"` | the name of the suite |
+| `wait` | real time | `(ms) => Promise<void>`: lets `ms` pass for the store's TTLs. A store with a clock of its own can move it instead |
+| `close` | | called after each test with its store, to close it or clear what it kept |
+| `timeout` | `30000` | ms each test may take, for a slow database |
+
+Each test makes its own store, and keys carry a random part, so a database that is not
+emptied between runs passes too. The TTL test waits about four seconds of real time unless
+`wait` moves the store's clock:
+
+```ts notwoslash
+import { memoryStore } from "@vxnsin/inkan";
+import { storeConformance } from "@vxnsin/inkan/testing";
+
+let now = Date.now();
+storeConformance(() => memoryStore({ clock: () => now }), { wait: async (ms) => void (now += ms) });
+```
+
+When you publish it, say which inkan it was tested with (`peerDependencies`
+`"@vxnsin/inkan": ">=0.8.0 <1.0.0"`), and [list it on Hanko](/docs/publish-a-plugin).

@@ -29,4 +29,23 @@ app.register((auth) => {
 | `window` | one minute | the window in milliseconds |
 | `key` | `ctx.ip` | who counts as one client: `(ctx) => string`, e.g. a user id or an API key |
 
-The counts live in memory, in each process: with `workers`, each worker counts for itself.
+| `store` | this process's memory | a [`Store`](/docs/storage) the processes share: one atomic `increment` per request |
+| `prefix` | `"rate-limit:"` | what the store's keys start with; give two limits that share a store their own |
+
+Without a `store` the counts live in memory, in each process: with `workers`, each worker
+counts for itself. With one, every process and every server counts together:
+
+```ts notwoslash
+import { redisStore } from "@inkanjs/redis";
+
+const store = redisStore(redis);
+app.register(rateLimit({ max: 120, store }));
+app.register((auth) => {
+  auth.register(rateLimit({ max: 5, store, prefix: "login:" }));
+  auth.post("/login", { body: Login }, login);
+});
+```
+
+Windows are fixed: they start at multiples of `window` since the epoch, and each request is
+one `increment`, which keeps the TTL the first one gave its key. A store that fails fails the
+request with a 500, rather than letting it through uncounted.

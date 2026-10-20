@@ -3,8 +3,9 @@ title: "Sessions"
 description: "Cookie sessions: signed, encrypted, or a random id in front of a store."
 ---
 
-<Callout title="Needs inkan 0.7">
-  `@inkanjs/session` needs inkan 0.7.0 or newer.
+<Callout title="Needs inkan 0.8">
+  `@inkanjs/session` 0.2 needs inkan 0.8.0 or newer, below 1.0. It keeps sessions in any inkan
+  [`Store`](/docs/storage), with TTLs in milliseconds.
 </Callout>
 
 ```sh
@@ -46,27 +47,27 @@ A signed cookie cannot be changed, but anyone who has it can read it: keep nothi
 it. A cookie session lasts until it expires even after `destroy()`, if someone kept a copy.
 When logout must end a session for certain, use a store.
 
-```ts
-import { memoryStore, session } from "@inkanjs/session";
+```ts notwoslash
+import { memoryStore } from "@vxnsin/inkan";
+import { session } from "@inkanjs/session";
 
 app.register(session({ secret, store: memoryStore({ max: 50_000 }) }));
 ```
 
-`memoryStore` lives in the process: right for development and one process. For more, write
-the three methods against Redis or your database:
+The store is an inkan [`Store`](/docs/storage). `memoryStore` from `@vxnsin/inkan` lives in
+the process: right for development and one process. For more, any `Store` works, such as
+[Redis](/docs/official/redis), [PostgreSQL](/docs/official/postgres),
+[MongoDB](/docs/official/mongo) or [MySQL](/docs/official/mysql):
 
-```ts
-import type { SessionStore } from "@inkanjs/session";
+```ts notwoslash
+import { redisStore } from "@inkanjs/redis";
 
-const store: SessionStore = {
-  get: async (id) => JSON.parse((await redis.get(`sess:${id}`)) ?? "null") ?? undefined,
-  set: async (id, record, ttl) => void (await redis.set(`sess:${id}`, JSON.stringify(record), "EX", ttl)), // ttl in seconds
-  delete: async (id) => void (await redis.del(`sess:${id}`)),
-};
+app.register(session({ secret, store: redisStore(redis) }));
 ```
 
-`ttl` is in **seconds**, as in [`@inkanjs/auth`](/docs/official/auth), and `record` is plain
-JSON: keep it as it is given.
+The plugin uses the store's `get`, `set` and `delete`, keeps one record per session
+(`{ d, c, f? }`, plain JSON), and gives it a TTL of `cookie.maxAge` in milliseconds. A store
+that is not a `Store` is refused when the plugin is made.
 
 ## ctx.session
 
@@ -137,7 +138,7 @@ app
 | --- | --- | --- |
 | `secret` | required | at least 32 bytes (a string as UTF-8, or bytes); a list rotates them |
 | `encrypt` | `false` | AES-256-GCM instead of a signature; ignored with a store |
-| `store` | none | `{ get(id), set(id, record, ttl), delete(id) }`, each may be async; `ttl` in **seconds** |
+| `store` | none | any inkan [`Store`](/docs/storage); the TTLs it gets are milliseconds, records plain JSON |
 | `rolling` | `false` | write the cookie on every answer, so a session lasts `maxAge` after the last request |
 | `maxLifetime` | none | seconds a session lasts at most from its start (or `regenerate()`), however active; with `rolling` you want one |
 | `cookie.name` | `"sid"` | |

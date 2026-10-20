@@ -4,14 +4,14 @@ description: "Shared and scoped plugins, decorations, route meta, OpenAPI and ho
 ---
 
 A plugin is a function that gets a scope and its options. Everything a plugin can do is the
-API of the app: routes, hooks, decorations, `describe`. This page is about what matters when
+API of the app: routes, hooks, decorations, `onOperation`. This page is about what matters when
 the plugin is for other people. The [hooks](/docs/hooks) page has the basics.
 
-<Callout title="New in 0.7.0">
-  `decorateRequest` (async too, with `before` and `when`), typed decorations and routes out
-  of plugins, `ctx.route.security` and `meta`, `describe()` with `ref()`, `scope.dev` and
-  `scope.prefix`, `ctx.rawHeaders`, `onSend(fn, { last: true })`, `trustProxy` and the
-  `inkan` version range.
+<Callout title="New in 0.8.0">
+  `register(plugin, options, { prefix })`, `{ order: "last" }` on every hook, `around()`,
+  `stateKey` for typed slots in `ctx.state`, `joinPath`, and `cors` as a shared plugin. From
+  0.8.0 the stable API is frozen: see [Stability](/docs/stability) for what a plugin can rely
+  on, and declare `inkan: ">=0.8.0 <1.0.0"`.
 </Callout>
 
 ## Shared or scoped
@@ -28,7 +28,7 @@ const poweredBy = plugin((app) => {                    // shared: acts on the sc
   app.onSend((ctx, answer) => void (answer.headers["x-powered-by"] = "tea"));
 }, { shared: true, name: "powered-by" });
 
-app.register(admin, { prefix: "/admin" });
+app.register(admin, {}, { prefix: "/admin" });
 app.register(poweredBy);
 ```
 
@@ -53,8 +53,13 @@ const debug = plugin((scope) => {
 
 Every scope says, read-only, whether the app runs in development (`scope.dev`, the app's
 `dev` option) and under which path prefix it was registered (`scope.prefix`: `""` for the
-app, `"/admin"` for `register(plugin, { prefix: "/admin" })`). A plugin that sets a cookie
-path or builds a link from its own routes reads `prefix` instead of asking for it again.
+app, `"/admin"` for `register(plugin, options, { prefix: "/admin" })`). A plugin that sets a
+cookie path or builds a link from its own routes reads `prefix` instead of asking for it
+again, and puts paths together with `joinPath(scope.prefix, "/login")`, which leaves one
+slash between the parts.
+
+The second argument of `register` is what the plugin is handed, the third where it is
+mounted: a plugin's options never need a `prefix` of their own.
 
 ## decorate or decorateRequest
 
@@ -83,12 +88,12 @@ app.decorateRequest("user", async (ctx) => {
   const user = await sessions.load(ctx.cookies.sid);
   if (!user) throw problem(401, "unauthorized");
   return user;
-}, { before: "handler", when: (route) => route.security.length > 0 });
+}, { resolve: "preHandler", when: (route) => route.security.length > 0 });
 
 app.get("/me", { security: { apiKey: "sid", in: "cookie" } }, ({ user }) => user.name); // the value, not a promise
 ```
 
-With `before: "handler"` the promise is awaited after the input is checked and before the
+With `resolve: "preHandler"` the promise is awaited after the input is checked and before the
 `preHandler` hooks, so they and the handler see the value itself, typed without the promise.
 That loads it for every request of the routes it covers, read or not, so `when` picks them,
 asked once per route with its `ctx.route` view. Reading it on a route `when` leaves out
@@ -143,7 +148,7 @@ const auth = plugin((app) =>
     .post("/logout", {}, logout),
 );
 
-export const api = inkan().register(auth, { prefix: "/auth" }).get("/teas", listTeas);
+export const api = inkan().register(auth, {}, { prefix: "/auth" }).get("/teas", listTeas);
 
 // web.ts
 const shop = client<typeof api>("https://shop.example");
@@ -201,13 +206,13 @@ to a route's header schema, `rawHeaders` is the request's as it arrived (read it
 change it). `ctx.secure` and `ctx.protocol` say whether the request came over TLS, the
 proxies' word included under `trustProxy`.
 
-## describe(): adding to OpenAPI
+## onOperation(): adding to OpenAPI
 
-A plugin that adds a header or an answer should say so in the document. `describe` runs for
+A plugin that adds a header or an answer should say so in the document. `onOperation` runs for
 every route of its scope when the document is written, never per request:
 
 ```ts
-app.describe((op, route, components) => {
+app.onOperation((op, route, components) => {
   if (!route.security?.includes("bearer")) return;
   components.securitySchemes!.bearer!.bearerFormat = "JWT";
   op.responses["403"] ??= { description: "The token does not allow this" };
@@ -231,7 +236,7 @@ import { t } from "@vxnsin/inkan";
 
 const Locked = t.object({ until: t.string() });
 
-app.describe((op, route, components, ref) => {
+app.onOperation((op, route, components, ref) => {
   if (!route.meta.locks) return;
   op.responses["423"] ??= {
     description: "Locked",
@@ -240,18 +245,55 @@ app.describe((op, route, components, ref) => {
 });
 ```
 
-## onSend order and `last`
+## Hook order: `order: "last"`
 
-`onSend` hooks run outermost scope first, in the order they were added. A hook that changes
-the bytes of the body should come after all of them, and `{ last: true }` says so:
+Hooks run outermost scope first, in the order they were added. A hook that has to come after
+all the others of its kind says so with `{ order: "last" }`, which every hook takes. An
+`onSend` hook that changes the bytes of the body is the usual case:
 
 ```ts
-app.onSend((ctx, answer) => sign(answer), { last: true });
+app.onSend((ctx, answer) => sign(answer), { order: "last" });
 ```
 
-Last hooks run after every other `onSend` hook of the route, again outermost first.
+Last hooks run after every other hook of their kind on the route, again outermost first.
 `compress` is one, so a hook that reads the body (an [ETag](/docs/official/etag), a
 signature) sees it before it is packed, wherever either was registered.
+
+## around(): wrapping the handler
+
+```ts
+const timing = plugin((scope) => {
+  scope.around(async (ctx, next) => {
+    const t0 = performance.now();
+    await next();
+    ctx.header("server-timing", `app;dur=${(performance.now() - t0).toFixed(1)}`);
+  });
+}, { shared: true, name: "timing" });
+```
+
+`around(fn)` wraps the handler of every route of the scope and the scopes inside it, those
+defined before the call too, where a route's own middleware runs: after the input is checked
+and the preHandler hooks. `await next()` runs the rest. Outer scopes' `around` wrap inner
+ones', and each is joined into the route once, before the first request. Right for timing,
+a transaction around the handler, or an AsyncLocalStorage of your own. Experimental.
+
+## stateKey: a slot of your own in ctx.state
+
+```ts
+import { stateKey } from "@vxnsin/inkan";
+
+export const tenant = stateKey<Tenant>("tenant");
+
+const tenants = plugin((scope) => {
+  scope.onRequest((ctx) => tenant.set(ctx, lookUp(ctx.headers.host)));
+}, { shared: true, name: "tenants" });
+
+app.get("/me", (ctx) => tenant.get(ctx)?.name);
+```
+
+A string key in `ctx.state` is anybody's: two plugins that pick `"tenant"` overwrite each
+other. `stateKey<T>(name)` keeps the value under a symbol of its own, typed, and the plugin
+exports the key to whoever should read it. Experimental.
 
 ## The pages inkan serves itself
 

@@ -3,10 +3,10 @@ title: "Auth"
 description: "Sessions, JWTs, API keys and basic auth, roles, CSRF, 2FA, OAuth and refresh tokens, on node:crypto alone."
 ---
 
-<Callout title="Needs inkan 0.7">
-  `@inkanjs/auth` needs inkan 0.7.0 or newer, and Node 22.18 or newer. It declares
-  `inkan: ">=0.7.0 <0.8.0"`, as every official package does: `register()` throws on another
-  version.
+<Callout title="Needs inkan 0.8">
+  `@inkanjs/auth` 0.2 needs inkan 0.8.0 or newer, and Node 22.18 or newer. It declares
+  `inkan: ">=0.8.0 <1.0.0"`, as every official package does: `register()` throws on another
+  version. It keeps its state in any inkan [`Store`](/docs/storage), with TTLs in milliseconds.
 </Callout>
 
 ```sh
@@ -95,7 +95,7 @@ The cookie holds a random 256-bit id and its HMAC; the session itself is in the
 - A user that `byId` no longer finds ends the session.
 
 ```ts
-auth({ secret, users, session: { cookie: "__Host-sid", maxAge: "12h", store: redisStore } });
+auth({ secret, users, session: { cookie: "__Host-sid", maxAge: "12h", store: redisStore(redis) } });
 ```
 
 `secret: [newSecret, oldSecret]` rotates: the first signs, all verify. Remove the old one
@@ -259,9 +259,23 @@ out from one machine. Here one machine only locks itself; locking the account fo
 takes many failures from many addresses.
 
 A lockout skips the user lookup and the hash; a success clears the login's counters.
-Counters forget after `window` (15 minutes) of quiet. They live in `bruteForce.store`, by
-default a bounded store of their own, so a flood of made-up logins never pushes sessions or
-refresh tokens out of `store`. With several processes, give it a shared one.
+
+How the counting holds up under pressure:
+
+- **Every attempt is counted.** A counter is one atomic `increment` in the store, so a burst
+  of parallel guesses is counted in full, in every process that shares the store, not read
+  and written back by each.
+- **The lockout escalates.** Past its free failures, each further one doubles the wait (1 s,
+  2 s, 4 s, … up to `maxDelay`). The attempt that crosses the line claims the lock with an
+  atomic `add`: of a burst, only that one goes on to the password check; the rest find the
+  lock taken and get the 429 at once, in every process.
+- **Fixed windows.** A counter forgets `window` (15 minutes) after its first failure, not
+  after `window` of quiet, so a slow guesser cannot keep one alive forever.
+
+Counters live in `bruteForce.store`, a `Store` of their own (by default a `memoryStore` of
+50 000 keys), so a flood of made-up logins never pushes sessions or refresh tokens out of
+`store`. With several processes, give it a shared one. `window` and `maxDelay` are seconds;
+the store gets milliseconds.
 
 <Callout type="warn" title="Behind a proxy: not trustProxy: true">
   The per-address counter is only as good as `ctx.ip`. `inkan({ trustProxy: true })` takes
@@ -389,27 +403,30 @@ scheme: list your public origin in `origins`.
 
 ## Store
 
-Sessions, refresh tokens, pending TOTP secrets and used TOTP steps live in `store`, by
-default `memoryStore()`, in the process. For several processes, give a shared one:
+Sessions, refresh tokens, pending TOTP secrets and used TOTP steps live in `store`; the
+brute-force counters in `bruteForce.store`, a second one. Both are inkan
+[`Store`](/docs/storage)s, by default `memoryStore()` from `@vxnsin/inkan`: in memory, per
+process (100 000 keys for `store`, 50 000 for the counters). For several processes, give
+shared ones, from an adapter or written against the interface:
 
-```ts
-const store: AuthStore = {
-  get: (key) => redis.get(key).then((v) => (v ? JSON.parse(v) : undefined)),
-  set: (key, value, ttlSeconds) => redis.set(key, JSON.stringify(value), "EX", ttlSeconds),
-  delete: (key) => redis.del(key),
-  // these two must each be ONE atomic step of the store:
-  take: (key) => redis.getdel(key).then((v) => (v ? JSON.parse(v) : undefined)),
-  add: (key, value, ttlSeconds) =>
-    redis.set(key, JSON.stringify(value), "EX", ttlSeconds, "NX").then((r) => r === "OK"),
-};
+```ts notwoslash
+import { redisStore } from "@inkanjs/redis";
+
+const store = redisStore(redis);
+app.register(auth({ secret, users, store, bruteForce: { store } }));
 ```
 
-`take(key)` reads and removes; `add(key, value, ttl)` writes only when the key is free and
-says whether it did. They are what makes a refresh token, a recovery code or a pending TOTP
-secret usable once across processes. A store without them still works, but those steps are
-then a read and a write, atomic only within one process. TTLs are in seconds.
+What the plugin needs of it:
 
-`memoryStore({ max })` keeps at most `max` entries (100 000), dropping the oldest first.
+- `add` and `take` make a refresh token, a recovery code, a TOTP code and a pending TOTP
+  secret usable once, across processes too.
+- `increment` counts failed logins, so parallel guesses are counted in full.
+- TTLs are in **milliseconds**, as in every `Store`. A store of your own that still takes
+  seconds keeps keys a thousand times too long.
+
+A store without `add`, `take` and `increment` is refused when the plugin is made. Every
+adapter on [Storage](/docs/storage#choosing-an-adapter) has them; one of your own passes the
+[conformance suite](/docs/storage#writing-an-adapter) first.
 
 ## Options
 
@@ -426,13 +443,13 @@ then a read and a write, atomic only within one process. TTLs are in seconds.
 | `routes` | `"/auth"` | where the routes go; `false` for none. They reach `client<typeof app>` |
 | `example` | none | `{ login, password }` of a test account (no TOTP): `inkan check` logs in with it, then calls `/me` and `/logout` with the session cookie |
 | `origins` | `[]` | other origins of yours for the CSRF check |
-| `store` | `memoryStore()` | `get`, `set(key, value, ttl)`, `delete`, and atomic `take`, `add` when shared |
+| `store` | `memoryStore()` | any inkan [`Store`](/docs/storage): sessions, refresh tokens, TOTP steps |
 | `publicUser` | `{ id, roles }` | what `/login` and `/me` show |
 | `userSchema` | matches the default | the contract of `publicUser` |
 | `roles` | `user.roles` | a user's roles |
 | `password` | `{ ln: 17, r: 8, p: 1 }` | scrypt cost for the dummy hash and rehashing |
 | `hashing` | `{ concurrency: 4, waitMs: 1000 }` | password checks at once, and how long others wait |
-| `bruteForce` | on | `{ freeAttempts: 5, loginFreeAttempts: 100, ipFreeAttempts: 50, maxDelay: 900, window: 900, store }`, or `false` |
+| `bruteForce` | on | `{ freeAttempts: 5, loginFreeAttempts: 100, ipFreeAttempts: 50, maxDelay: 900, window: 900, store }`, or `false`; `maxDelay` and `window` in seconds, `store` any `Store` |
 
 Durations take seconds or a string like `"15m"`, `"12h"`, `"7d"`.
 
@@ -446,7 +463,6 @@ Exported for what the plugin does not do, such as password reset or invite links
 | `randomToken(bytes)`, `hashToken(token)`, `safeEqual(a, b)` | random tokens, stored hashed, compared in constant time |
 | `signJwt`, `verifyJwt`, `jwksSource` | JWTs for other services |
 | `github`, `google`, `oidcProvider` | providers for `oauth.providers` |
-| `memoryStore` | the store above |
 | `AuthError` | the errors of the helpers, with a stable `code` |
 
 A password reset, for instance: send `randomToken()` by mail, store `hashToken()` of it with
@@ -481,11 +497,11 @@ What it does not do, and where it relies on you:
 
 - **A process-local store is per process.** Behind several processes, use a shared `store`
   and a shared `bruteForce.store`, or sessions, lockouts and refresh rotation do not hold
-  across them. The one-time steps need atomic `take` and `add`.
-- **Refresh rotation is atomic across processes only with an atomic `add`.** Without it,
-  two uses of one token at the same moment in two processes may both pass. A client that
-  sends the same refresh token twice at once loses its family: by design, it looks like
-  theft.
+  across them. Their `add`, `take` and `increment` must be atomic across them, as the
+  `Store` interface asks.
+- **Refresh rotation is atomic across processes**, by the store's `add`: of two uses of one
+  token at the same moment, in any processes, one passes. A client that sends the same
+  refresh token twice at once loses its family: by design, it looks like theft.
 - **Access tokens cannot be revoked** before they expire; keep `expiresIn` short. Sessions
   can: logout deletes them on the server.
 - **No "log out everywhere".** Sessions are not indexed by user. After a password change,

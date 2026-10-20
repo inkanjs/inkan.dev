@@ -93,3 +93,14 @@ server to what its docs say.
 | **Runs examples as tests** | `inkan check` or `app.check()`, in-process, no port. Routes without examples are listed, so nothing hides. |
 | **Shows what happened** | `/_inkan` is a live log of the last 200 requests and what broke the contract. Development only, loopback only, secret headers hidden. |
 | **Errors in one shape** | `throw problem(404, "tea-not-found", "…")` gives an RFC 9457 document. Every built-in error has the same shape, with a stable `type` to switch on. |
+
+
+## Stable from 0.8
+
+
+From 0.8.0 the API is frozen: what is marked stable does not break in a minor release, and a
+renamed name keeps working, with a warning in development, for at least two minors and six
+months. [Stability](/docs/stability) has the policy, what is still experimental, and the
+names that changed in 0.8.0. State that has to outlive a request or a process, such as jobs,
+rate limits and sessions, goes into one [`Store`](/docs/storage), in memory or shared through
+Redis, PostgreSQL, MongoDB or MySQL.

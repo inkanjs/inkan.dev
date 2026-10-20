@@ -32,18 +32,22 @@ RFC 9457 describes it: a stable `type` a client can switch on, a `title`, the `s
 
 ```ts
 problem(status, type, detail?, extra?)
+problem(status, type, { detail, extra, headers })
 ```
 
 Makes one. Thrown anywhere on the way, in a handler, a hook or a middleware, it becomes the
 answer. Returned instead of thrown, it is answered the same way, with its own status and
-shape (before 0.7.0 a returned problem went out as a 200). `extra` adds fields of your own.
-Headers go on `p.headers`:
+shape (before 0.7.0 a returned problem went out as a 200). `detail` is for people, `extra`
+adds fields of your own, `headers` go on the answer:
 
 ```ts
-const p = problem(429, "slow-down", "Try again in a minute");
-p.headers["retry-after"] = "60";
-throw p;
+throw problem(429, "slow-down", { detail: "Try again in a minute", headers: { "retry-after": "60" } });
+throw problem(402, "insufficient-funds", { detail: "Top up first", extra: { balance: 30 } });
+throw problem(404, "tea-not-found", `There is no tea with id ${id}`); // the short form, detail only
 ```
+
+The options form is new in 0.8.0; the positional one stays. Headers can still be set on
+`p.headers` of a problem made earlier.
 
 ## The ones inkan sends by itself
 

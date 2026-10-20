@@ -3,8 +3,8 @@ title: "ETag"
 description: "ETags and 304 Not Modified, hashed before compression."
 ---
 
-<Callout title="Needs inkan 0.7">
-  `@inkanjs/etag` needs inkan 0.7.0 or newer.
+<Callout title="Needs inkan 0.8">
+  `@inkanjs/etag` needs inkan 0.8.0 or newer, below 1.0.
 </Callout>
 
 ```sh
@@ -35,7 +35,7 @@ tag is a hash of exactly the bytes that are sent.
   since their bytes are not known before they go out.
 - **Which bytes.** SHA-1, base64url, of the body as the client gets it: JSON as the contract
   wrote it, text as UTF-8. `compress` runs after every other `onSend` hook
-  ([`last: true`](/docs/plugins)), so the tag is that of the
+  ([`order: "last"`](/docs/plugins#hook-order-order-last)), so the tag is that of the
   unpacked body, the same for gzip, brotli and none.
 - **If-None-Match.** A list, `*`, and `W/` tags, compared weakly as RFC 9110 asks: `W/"a"`
   matches `"a"`. A match is a 304 with the tag and the other headers, without content-type,

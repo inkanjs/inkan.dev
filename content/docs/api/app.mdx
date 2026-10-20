@@ -9,7 +9,7 @@ import { inkan, t } from "@vxnsin/inkan";
 const app = inkan({ title: "Tea Shop", version: "1.0.0" })
   .get("/hello", () => ({ hello: "world" }));
 
-await app.listen(3000);
+await app.listen({ port: 3000 });
 ```
 
 `inkan(options)` makes an app. Routes, hooks, decorations and plugins are added to it in a
@@ -24,9 +24,11 @@ app.post("/teas", { body: NewTea, response: { 201: Tea } }, ({ body, reply }) =>
 app.put("/teas/:id", spec, handler);
 app.patch("/teas/:id", spec, handler);
 app.delete("/teas/:id", spec, handler);
+app.all("/legacy/*", spec, handler); // GET, POST, PUT, PATCH and DELETE
 ```
 
-One method per HTTP method: the path, the spec (optional) and the handler. A HEAD request
+One method per HTTP method: the path, the spec (optional) and the handler. `all` defines
+the same route for GET, POST, PUT, PATCH and DELETE at once. A HEAD request
 is answered by the GET route of its path, without the body. An OPTIONS request gets the
 methods the path takes. [Routing](/docs/api/routing) has everything a spec can say.
 
@@ -70,8 +72,29 @@ Hooks run for the routes of their scope, in this order:
 
 A route with no hooks anywhere above it takes the fast path, with no hook machinery at all.
 
-`onSend(fn, { last: true })` runs a hook after every other `onSend` hook of the route,
-outermost scope first: for a hook that changes the body's bytes, as `compress` does.
+Every hook takes `{ order: "last" }`: it then runs after every other hook of its kind on the
+route, wherever those were added, outermost scope first among the last ones too. For an
+`onSend` hook that changes the body's bytes, as `compress` does, that is where it belongs.
+
+```ts
+app.onSend((ctx, answer) => sign(answer), { order: "last" });
+```
+
+## around()
+
+```ts
+app.around(async (ctx, next) => {
+  const t0 = performance.now();
+  await next();
+  metrics.observe(ctx.route!.path, performance.now() - t0);
+});
+```
+
+Wraps the handler of every route in the scope and the scopes inside it, those defined before
+the call too. It runs where a route's own middleware runs (after the input is checked and
+the preHandler hooks), outside that middleware, and `await next()` runs the rest. Outer
+scopes' `around` wrap inner ones'. It is joined into each route once, before the first
+request, so a route pays for it only when a scope above it has one. Experimental, new in 0.8.0.
 
 ## register()
 
@@ -85,10 +108,11 @@ const admin = plugin((scope, options: { token: string }) => {
   scope.get("/stats", () => stats());
 });
 
-app.register(admin, { prefix: "/admin", token: process.env.ADMIN_TOKEN! });
+app.register(admin, { token: process.env.ADMIN_TOKEN! }, { prefix: "/admin" });
 ```
 
-A plugin gets a scope of its own: its hooks, decorations and layout reach the routes defined
+`register(plugin, options, { prefix })`: the second argument is what the plugin is handed,
+the third where it is mounted. A plugin gets a scope of its own: its hooks, decorations and layout reach the routes defined
 inside it and nothing outside. Made with `plugin(fn, { shared: true })`, it acts on the
 scope it is registered in instead, which is right for a plugin like a rate limit.
 Plugins run in the order they are registered; one that returns a promise holds back the
@@ -116,7 +140,7 @@ app.get("/me", ({ user }) => user); // typed
 A value made anew for each request. The function runs the first time a request reads
 `ctx.user`, and the value is kept for the rest of that request; a request that never reads
 it never makes it. Names are refused as with `decorate`. An `init` that returns a promise,
-with `{ before: "handler", when }`, is awaited before the handler: see
+with `{ resolve: "preHandler", when }`, is awaited before the handler: see
 [async decorations](/docs/plugins#async-decorations). New in 0.7.0.
 
 ## job()
@@ -130,8 +154,8 @@ app.job("/exports", { body: Range, progress: Progress, result: Export }, async (
 
 Work that takes longer than a request, as five routes around a queue: start it, look at it,
 follow it as server-sent events, wait for its result, cancel it. Jobs run in this process.
-[Jobs](/docs/jobs) has the routes, the options and the limits. `every` starts one on a cron
-schedule. New in 0.7.0.
+[Jobs](/docs/jobs) has the routes, the options and the limits. `schedule` starts one on a cron
+schedule, and `store` keeps jobs in a [`Store`](/docs/storage) the processes share. New in 0.7.0.
 
 ## ws()
 
@@ -148,10 +172,10 @@ like a GET, then the socket speaks JSON by the `message` and `send` contracts.
 [WebSockets](/docs/websocket) has the socket, the origins, the options and the close codes.
 New in 0.7.0.
 
-## describe()
+## onOperation()
 
 ```ts
-app.describe((op, route, components, ref) => {
+app.onOperation((op, route, components, ref) => {
   if (route.security.length) op.responses["403"] ??= { description: "Not allowed for these credentials" };
   if (route.spec.tags?.includes("billing")) {
     op.responses["402"] ??= { description: "Pay first", content: { "application/json": { schema: ref(Invoice, "Invoice") } } };
@@ -161,7 +185,7 @@ app.describe((op, route, components, ref) => {
 
 Adds to the OpenAPI operation of every route in the scope: header parameters, answers,
 descriptions, details of a security scheme. It runs when the document is written, never
-per request, outer scopes first. New in 0.7.0.
+per request, outer scopes first. Experimental.
 
 | argument | |
 | --- | --- |
@@ -182,7 +206,16 @@ const audit = plugin((scope) => {
 Read-only. `dev` is whether the app runs in development (the `dev` option, by default
 `NODE_ENV` is not `"production"`), on the app and on every scope; set it with the option.
 `prefix` is the path prefix of the scope: `""` for the app, `"/v1"` for a plugin registered
-with `{ prefix: "/v1" }`. New in 0.7.0.
+with `register(p, options, { prefix: "/v1" })`. New in 0.7.0.
+
+```ts
+import { joinPath } from "@vxnsin/inkan";
+
+joinPath(scope.prefix, "/login"); // "/auth/login", one slash between the parts
+```
+
+`joinPath(a, b)` puts two paths together with one slash between them, for a plugin that
+writes a link or a cookie path under its own prefix. New in 0.8.0.
 
 ## layout()
 
@@ -226,12 +259,23 @@ A route for every file in a folder: `teas/[id].ts` exporting `GET` is `GET /teas
 ## listen()
 
 ```ts
-await app.listen();             // $PORT, or 3000
-await app.listen(8080, "0.0.0.0");
+await app.listen();                                  // $PORT, or 3000
+await app.listen({ port: 8080, host: "127.0.0.1" });
+
+const ac = new AbortController();
+await app.listen({ port: 0, signal: ac.signal });
+ac.abort(); // stops the server and the app, as SIGTERM would, without ending the process
 ```
 
-Starts the server once every plugin has loaded. The port comes from the argument, then
-`$PORT`, then 3000. On SIGINT or SIGTERM it lets open requests finish, up to ten seconds.
+Starts the server once every plugin has loaded. The port comes from `port`, then `$PORT`,
+then 3000, the host from `host`, then `$HOST`, then every interface. On SIGINT or SIGTERM
+it lets open requests finish, up to ten seconds. Aborting `signal` does the same (jobs,
+sockets, onClose hooks) and leaves the process running, which is what a test wants.
+`listen(port, host)` works too.
+
+When development mode was guessed (no `dev` option, `NODE_ENV` is not `"production"`) and
+the address is one other machines reach, `listen` warns: that is most likely a deploy
+without `NODE_ENV=production`. `dev: true` or a loopback host quiets it.
 
 ## onListen(), onClose()
 
@@ -260,18 +304,29 @@ http.createServer(app.listener).listen(3000);
 
 `listener` is a plain Node `(req, res)` function. `exchange(request)` takes and gives plain
 values, which is all an adapter to another server needs, and `bodyFor(method, url)` tells
-such an adapter how much body a route takes, and whether it reads it itself.
+such an adapter how much body a route takes, and whether it reads it itself. An adapter
+hands the request's `httpVersion` in, for [`ctx.httpVersion`](/docs/api/context#method-path-url-httpversion).
+
+```ts
+app.logRequest({ time: new Date().toISOString(), method, path, status: 101, ms, notes: [] });
+```
+
+`logRequest(entry)` writes one request's log line the way the app's `log` and `logger`
+options say, for an adapter that answers some requests itself (an upgrade, a file it serves
+without the app). Requests through `exchange`, `fetch` or `listen` are logged already. New
+in 0.8.0.
 
 ## inject()
 
 ```ts
-const res = await app.inject({ method: "POST", url: "/teas", body: { name: "Sencha" } });
-res.status; // 201
-res.body;   // the parsed JSON
+const res = await app.inject<Tea>({ method: "POST", url: "/teas", body: { name: "Sencha" } });
+res.status;    // 201
+res.body.name; // the parsed JSON, typed as a Tea
 ```
 
 A request straight into the app, with no port and no network: for tests. It answers
-`{ status, headers, cookies, text, body }`.
+`{ status, headers, cookies, text, body }`. `inject<T>()` types the body; it is not
+checked against `T`.
 
 ## check()
 
@@ -283,8 +338,8 @@ Runs every route's examples against the app, as `inkan check` does from the comm
 
 ## openapi(), routes(), sealed()
 
-`openapi()` is the OpenAPI 3.1 document, `routes()` every route as inkan sees it, and
-`sealed()` how the seal went: how many contracts run on it, and which changed since.
+`openapi()` is the OpenAPI 3.1 document, `routes()` every route as it was written (method,
+path, security, meta, spec), frozen, and `sealed()` how the seal went: how many contracts run on it, and which changed since.
 
 ## Options
 
@@ -303,9 +358,11 @@ Runs every route's examples against the app, as `inkan check` does from the comm
 | `gracefulShutdown` | `true` | lets open requests finish on SIGINT and SIGTERM |
 | `workers` | one process | `"auto"` or a number: a process per core, one port |
 | `trustProxy` | off | believe the proxies in front about the client: `true` for every one, a number of hops, or `(ip) => boolean` for the addresses that are yours. `ctx.ip`, and with it `rateLimit`, then reads `x-forwarded-for` or `forwarded`. New in 0.7.0 |
-| `wsOrigins` | the own origin | the pages that may open the app's WebSockets, for every route without `origins` of its own; see [WebSockets](/docs/websocket#who-may-open-it-origins). New in 0.7.0 |
+| `ws` | | defaults for every WebSocket route without its own: `{ origins, maxMessage, heartbeat, handshakeTimeout }`; see [WebSockets](/docs/websocket#who-may-open-it-origins). New in 0.8.0 |
 | `pressure` | off | overload protection: a 503 `under-pressure` while the event loop lags or memory runs high; `app.pressure()` hands back the last sample. See [Running in production](/docs/runtime#pressure-overload-protection). New in 0.7.0 |
-| `context` | `false` | answer each request inside an AsyncLocalStorage, for [`context()`](/docs/runtime#context-the-request-anywhere). New in 0.7.0 |
+| `context` | `false` | answer each request inside an AsyncLocalStorage, for [`currentContext()`](/docs/runtime#currentcontext-the-request-anywhere). New in 0.7.0 |
 | `dev` | `NODE_ENV !== "production"` | development mode |
-| `onError` | `console.error` | sees every error that becomes a 500 |
+| `onError` | `console.error` | `(error, ctx)`: sees every error that is a bug, not an answer. `ctx` is `undefined` for an error from outside any request (the socket, a stream after its answer started) |
 | `seal` | | the contracts `inkan seal` stamped into code |
+
+`app.options` hands the options back, read-only: they are fixed once the app is made.
