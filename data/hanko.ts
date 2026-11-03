@@ -394,6 +394,15 @@ export const hanko: Hanko[] = [
     repo: INTEGRATIONS,
     tags: ["uwebsockets", "performance", "server", "runtime"],
   },
+  {
+    name: "@inkanjs/bun",
+    description: "An inkan app on Bun.serve, WebSocket routes on Bun's own sockets through app.upgrade.",
+    kind: "integration",
+    href: "/docs/integrations/bun",
+    npm: "@inkanjs/bun",
+    repo: INTEGRATIONS,
+    tags: ["bun", "websockets", "server", "runtime"],
+  },
 
   /* ---------- recipes: no package, a page of the docs ---------- */
   {

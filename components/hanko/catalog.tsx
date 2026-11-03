@@ -108,7 +108,7 @@ function Card({ h, still }: { h: Hanko; still: boolean | null }) {
       className="group relative flex flex-col rounded-2xl border border-line bg-card/70 p-5 transition-colors hover:border-hot"
     >
       <div className="flex items-start justify-between gap-3">
-        <h3 className="min-w-0 break-words font-mono text-[15px] font-bold leading-snug">
+        <h3 className="min-w-0 break-all font-mono text-[15px] font-bold leading-snug">
           {/* the whole card is the link; the copy button and the source sit above it */}
           {internal ? (
             <Link href={h.href} className="outline-none after:absolute after:inset-0 after:rounded-2xl focus-visible:after:ring-2 focus-visible:after:ring-hot">

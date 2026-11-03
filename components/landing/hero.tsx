@@ -98,7 +98,7 @@ export function Hero() {
 
   return (
     <section data-tone="hero" className="relative mx-auto grid w-full max-w-6xl items-center gap-12 px-5 pb-20 pt-16 sm:px-8 lg:grid-cols-[1.05fr_1fr] lg:pt-24">
-      <div>
+      <div className="min-w-0">
         <div className="relative mb-8 h-24 w-24">
           {/* the ink that spreads where the seal lands */}
           <AnimatePresence>
@@ -165,7 +165,7 @@ export function Hero() {
           transition={{ delay: 1.4, duration: 0.6, ease }}
           className="mt-8 flex flex-wrap items-center gap-3"
         >
-          <Copy text="npm i @vxnsin/inkan" />
+          <Copy text="npm create inkan@latest" />
           <Link
             href="/docs"
             className="rounded-xl bg-seal px-5 py-3 font-mono text-sm font-bold text-[#fbf1e6] shadow-[0_8px_24px_rgba(196,56,31,.35)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(196,56,31,.45)]"
@@ -173,7 +173,8 @@ export function Hero() {
             Read the docs
           </Link>
           <p className="basis-full font-mono text-xs text-muted">
-            or start from a working project: <span className="text-soft">npx @vxnsin/inkan examples</span>
+            a project with a store, auth and tests · into one you have:{" "}
+            <span className="text-soft">npm i @vxnsin/inkan</span>
           </p>
         </motion.div>
       </div>
@@ -182,6 +183,7 @@ export function Hero() {
         initial={still ? false : { opacity: 0, x: 40, rotate: 1.5 }}
         animate={{ opacity: 1, x: 0, rotate: 0 }}
         transition={{ delay: 0.55, duration: 0.9, ease }}
+        className="min-w-0"
       >
         <Session />
       </motion.div>

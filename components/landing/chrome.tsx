@@ -75,8 +75,8 @@ export function Footer() {
           </p>
         </div>
         {[
-          { title: "Learn", links: [["Docs", "/docs"], ["Installation", "/docs/installation"], ["Routes", "/docs/routes"], ["Compared", "/docs/compare"], ["From Express", "/docs/migrate/express"], ["From Fastify", "/docs/migrate/fastify"], ["inkan learn", "/#learn"]] },
-          { title: "Packages", links: [["@vxnsin/inkan", "https://www.npmjs.com/package/@vxnsin/inkan"], ["@inkanjs/vite", "/docs/integrations/vite"], ["@inkanjs/next", "/docs/integrations/next"], ["@inkanjs/query", "/docs/integrations/query"]] },
+          { title: "Learn", links: [["Docs", "/docs"], ["Installation", "/docs/installation"], ["Routes", "/docs/routes"], ["Compared", "/docs/compare"], ["From Express", "/docs/migrate/express"], ["From Fastify", "/docs/migrate/fastify"], ["npm create inkan", "/docs/installation#start-a-project"]] },
+          { title: "Packages", links: [["@vxnsin/inkan", "https://www.npmjs.com/package/@vxnsin/inkan"], ["@inkanjs/vite", "/docs/integrations/vite"], ["@inkanjs/next", "/docs/integrations/next"], ["@inkanjs/query", "/docs/integrations/query"], ["@inkanjs/uws", "/docs/integrations/uws"], ["@inkanjs/bun", "/docs/integrations/bun"], ["check-action", "https://github.com/inkanjs/check-action"]] },
           { title: "Project", links: [["Hanko", "/hanko"], ["Benchmarks", "/benchmarks"], ["Community", "/community"], ["Blog", "/blog"], ["GitHub", "https://github.com/inkanjs/inkan"], ["Integrations", "https://github.com/inkanjs/integrations"], ["Changelog", "https://github.com/inkanjs/inkan/blob/main/CHANGELOG.md"], ["This API's docs", "/api/docs"]] },
         ].map((col) => (
           <div key={col.title}>

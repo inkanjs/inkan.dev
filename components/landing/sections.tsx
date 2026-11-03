@@ -1,9 +1,9 @@
 "use client";
-// The rest of the landing page: how fast, where it fits, and how to learn it.
+// The rest of the landing page: how fast and where it fits.
 import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { Code, Window } from "@/components/code";
+import { Code } from "@/components/code";
 import { servers } from "@/data/bench";
 
 /* ---------- how fast ---------- */
@@ -21,7 +21,7 @@ export function Bench() {
   return (
     <section id="bench" data-tone="bench" className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8">
       <p className="font-mono text-sm text-hot">印 how fast</p>
-      <h2 className="mt-3 font-mono text-3xl font-extrabold sm:text-4xl">All of that, level with Fastify or a little ahead.</h2>
+      <h2 className="mt-3 font-mono text-3xl font-extrabold sm:text-4xl">All of that, and a little ahead of Fastify.</h2>
       <p className="mt-4 max-w-2xl text-soft">
         Requests per second, with plain <code className="font-mono text-ink">node:http</code> as 100. Every server runs at once
         and the measurements take turns, so a slow moment of the machine hits everyone alike.
@@ -110,6 +110,16 @@ const add = useMutation(q.post("/teas"));`,
 const server = await serve(app, { port: 3000 });
 // HTTPS, a gentle close, SIGTERM: all there`,
   },
+  {
+    key: "bun",
+    name: "@inkanjs/bun",
+    line: "On Bun.serve, WebSocket routes included, through app.upgrade.",
+    file: "server.ts",
+    code: `import { serve } from "@inkanjs/bun";
+
+const server = await serve(app, { port: 3000 });
+// bun run server.ts: HTTP and app.ws routes on Bun's own sockets`,
+  },
 ];
 
 export function Integrations() {
@@ -159,57 +169,34 @@ export function Integrations() {
   );
 }
 
-/* ---------- learn ---------- */
+/* ---------- start ---------- */
 
-const QUEST = [
-  { text: "  印 inkan learn · quest 3 of 12 · rules for a body", cls: "font-bold text-term-ink" },
-  { text: "", cls: "" },
-  { text: "  A body schema is checked before your handler", cls: "text-[#8a7d72]" },
-  { text: "  runs. A body that breaks it never reaches you.", cls: "text-[#8a7d72]" },
-  { text: "", cls: "" },
-  { text: "  Add POST /teas: name at least 1 character,", cls: "text-term-ink" },
-  { text: "  grams a whole number of at least 1.", cls: "text-term-ink" },
-  { text: "", cls: "" },
-  { text: "  ✗ POST /teas with { grams: -5 } answered 201:", cls: "text-hot" },
-  { text: "    it got in. Give grams a .min(1)", cls: "text-term-ink" },
-  { text: "  ✓ quest 3 done! rules for a body", cls: "font-bold text-ok" },
-];
-
-export function Learn() {
-  const ref = useRef<HTMLDivElement>(null);
-  const seen = useInView(ref, { once: true, margin: "-20% 0px" });
-  const still = useReducedMotion();
-  const on = seen || still;
+export function Start() {
   return (
-    <section id="learn" data-tone="learn" className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8">
-      <div ref={ref} className="grid items-center gap-10 lg:grid-cols-2">
-        <div>
-          <p className="font-mono text-sm text-hot">印 inkan learn</p>
-          <h2 className="mt-3 font-mono text-3xl font-extrabold sm:text-4xl">Twelve quests, in your terminal.</h2>
-          <p className="mt-4 text-soft">
-            A tutorial that watches your file as you save it. Each quest says what to build, checks it against a real app and
-            tells you what is missing. Offline, no account.
-          </p>
-          <code className="mt-6 inline-block rounded-xl border border-line bg-card px-4 py-3 font-mono text-sm">
-            <span className="text-hot">$</span> npx @vxnsin/inkan learn
-          </code>
-        </div>
-        <Window title="PowerShell — inkan learn">
-          <pre className="p-5 font-mono text-[12.5px] leading-[1.7] sm:text-[13.5px]">
-            {QUEST.map((l, i) => (
-              <motion.div
-                key={i}
-                className={l.cls}
-                initial={still ? false : { opacity: 0, x: -8 }}
-                animate={on ? { opacity: 1, x: 0 } : {}}
-                transition={{ delay: 0.2 + i * (i >= 8 ? 0.45 : 0.08), duration: 0.35 }}
-              >
-                {l.text}
-                {"​"}
-              </motion.div>
-            ))}
-          </pre>
-        </Window>
+    <section id="start" className="mx-auto w-full max-w-6xl px-5 pb-28 pt-8 sm:px-8">
+      <div className="rounded-3xl border border-hot/40 bg-seal/8 px-6 py-12 text-center sm:px-12">
+        <p className="font-mono text-sm text-hot">印 start</p>
+        <h2 className="mt-3 font-mono text-3xl font-extrabold sm:text-4xl">One command to a checked API.</h2>
+        <p className="mx-auto mt-4 max-w-xl text-soft">
+          Pick a store, logins and a frontend. You get a project that passes <code className="font-mono text-ink">inkan check</code>{" "}
+          and its own tests, with CI, before you write a line.
+        </p>
+        <code className="mt-8 inline-block rounded-xl border border-line bg-card px-5 py-3 font-mono text-sm">
+          <span className="text-hot">$</span> npm create inkan@latest my-api
+        </code>
+        <p className="mt-6 font-mono text-sm">
+          <Link href="/docs/installation#start-a-project" className="text-hot underline underline-offset-4">
+            what it asks
+          </Link>
+          <span className="text-muted"> · </span>
+          <Link href="/docs/compare" className="text-hot underline underline-offset-4">
+            when to pick something else
+          </Link>
+          <span className="text-muted"> · </span>
+          <a href="https://github.com/inkanjs/inkan" className="text-hot underline underline-offset-4">
+            the code
+          </a>
+        </p>
       </div>
     </section>
   );
