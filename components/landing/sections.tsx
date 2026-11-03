@@ -1,9 +1,9 @@
 "use client";
-// The rest of the landing page: how fast, where it fits, and how to learn it.
+// The rest of the landing page: how fast and where it fits.
 import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { Code, Window } from "@/components/code";
+import { Code } from "@/components/code";
 import { servers } from "@/data/bench";
 
 /* ---------- how fast ---------- */
@@ -159,58 +159,3 @@ export function Integrations() {
   );
 }
 
-/* ---------- learn ---------- */
-
-const QUEST = [
-  { text: "  印 inkan learn · quest 3 of 12 · rules for a body", cls: "font-bold text-term-ink" },
-  { text: "", cls: "" },
-  { text: "  A body schema is checked before your handler", cls: "text-[#8a7d72]" },
-  { text: "  runs. A body that breaks it never reaches you.", cls: "text-[#8a7d72]" },
-  { text: "", cls: "" },
-  { text: "  Add POST /teas: name at least 1 character,", cls: "text-term-ink" },
-  { text: "  grams a whole number of at least 1.", cls: "text-term-ink" },
-  { text: "", cls: "" },
-  { text: "  ✗ POST /teas with { grams: -5 } answered 201:", cls: "text-hot" },
-  { text: "    it got in. Give grams a .min(1)", cls: "text-term-ink" },
-  { text: "  ✓ quest 3 done! rules for a body", cls: "font-bold text-ok" },
-];
-
-export function Learn() {
-  const ref = useRef<HTMLDivElement>(null);
-  const seen = useInView(ref, { once: true, margin: "-20% 0px" });
-  const still = useReducedMotion();
-  const on = seen || still;
-  return (
-    <section id="learn" data-tone="learn" className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8">
-      <div ref={ref} className="grid items-center gap-10 lg:grid-cols-2">
-        <div>
-          <p className="font-mono text-sm text-hot">印 inkan learn</p>
-          <h2 className="mt-3 font-mono text-3xl font-extrabold sm:text-4xl">Twelve quests, in your terminal.</h2>
-          <p className="mt-4 text-soft">
-            A tutorial that watches your file as you save it. Each quest says what to build, checks it against a real app and
-            tells you what is missing. Offline, no account.
-          </p>
-          <code className="mt-6 inline-block rounded-xl border border-line bg-card px-4 py-3 font-mono text-sm">
-            <span className="text-hot">$</span> npx @vxnsin/inkan learn
-          </code>
-        </div>
-        <Window title="PowerShell — inkan learn">
-          <pre className="p-5 font-mono text-[12.5px] leading-[1.7] sm:text-[13.5px]">
-            {QUEST.map((l, i) => (
-              <motion.div
-                key={i}
-                className={l.cls}
-                initial={still ? false : { opacity: 0, x: -8 }}
-                animate={on ? { opacity: 1, x: 0 } : {}}
-                transition={{ delay: 0.2 + i * (i >= 8 ? 0.45 : 0.08), duration: 0.35 }}
-              >
-                {l.text}
-                {"​"}
-              </motion.div>
-            ))}
-          </pre>
-        </Window>
-      </div>
-    </section>
-  );
-}

@@ -8,7 +8,7 @@ import { Hero } from "@/components/landing/hero";
 import { Contract } from "@/components/landing/contract";
 import { Playground } from "@/components/landing/playground";
 import { Clips } from "@/components/landing/clips";
-import { Bench, Integrations, Learn } from "@/components/landing/sections";
+import { Bench, Integrations } from "@/components/landing/sections";
 import { Hanko } from "@/components/landing/hanko";
 import { pageMeta } from "@/lib/site";
 import { app } from "@/server/app";
@@ -53,7 +53,6 @@ export default function Home() {
         <Bench />
         <Integrations />
         <Hanko />
-        <Learn />
       </main>
       <Footer />
     </div>
