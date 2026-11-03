@@ -144,14 +144,96 @@ Before any hook, too: an upgrade that is not a GET over HTTP/1.1 without a body 
 
 Your own codes go from 4000 to 4999, as `socket.close(4000, "bye")` above.
 
+## On a server with WebSockets of its own: `app.upgrade`
+
+<Callout title="New in 0.9.0">
+  Experimental. For adapters: [@inkanjs/uws](/docs/integrations/uws) and
+  [@inkanjs/bun](/docs/integrations/bun) are built on it.
+</Callout>
+
+uWebSockets.js and Bun do the WebSocket wire themselves: the handshake, the frames, the masks,
+the pongs. `app.upgrade(request)` lets the app run its WebSocket routes on such a server, the
+way `listen` runs them. The server does the wire, the app does the meaning.
+
+It takes an [`AdapterRequest`](/docs/api/app#listener-exchange-bodyfor), as `app.exchange()` does, and decides the
+upgrade as `listen` would: it routes among the WebSocket routes, runs the checks that cost
+nothing first (a GET over HTTP/1.1 without a body, the origin, a free slot under
+`maxConnections`), then the hooks, the security, the input checks and middleware, all within
+the route's `handshakeTimeout`. The answer is one of two:
+
+- **A refusal**, `{ response }`. Write `response` as you would an answer of `exchange`, then
+  end the connection. With `response` undefined (the handshake ran out of time), end it
+  without an answer.
+- **A 101**, `{ status: 101, headers, cookies, accept, cancel }`. Upgrade with those headers
+  and one `Set-Cookie` per cookie; the server adds `Upgrade`, `Connection` and
+  `Sec-WebSocket-Accept`, no subprotocol and no extension. Once its socket is open, call
+  `accept(transport)` and route the server's callbacks to the events it returns. A connection
+  that is gone before it opened is `cancel()`ed instead, which frees its `maxConnections` slot
+  and aborts `ctx.signal`.
+
+```ts
+const r = await app.upgrade({ method, url, headers, remote, secure });
+if (r.status !== 101) return r.response ? write(r.response) : end();
+
+server.upgradeTo(r.headers, r.cookies, {        // whatever your server calls it
+  open(ws) {
+    ws.events = r.accept({
+      send: (data, binary) => ws.send(data, binary), // false: the app waits for drain()
+      close: (code, reason) => (code === 1006 ? ws.terminate() : ws.end(code, reason)),
+      ping: () => ws.ping(),
+    });
+  },
+  message: (ws, data, binary) => ws.events.message(data, binary),
+  drain: (ws) => ws.events.drain(),
+  pong: (ws) => ws.events.pong(),
+  close: (ws, code, reason) => ws.events.close(code, reason),
+  aborted: () => r.cancel(),
+});
+```
+
+The transport is the server's socket as the app drives it:
+
+| `WsTransport` | |
+| --- | --- |
+| `send(data, binary)` | one message, text or bytes. Return `false` when the server holds more than it wants to: the app's `send()` then waits for `drain()` |
+| `close(code, reason)` | starts the closing handshake, or for 1006 cuts the connection without a close frame. Either way the server calls `close` on the events once it is gone |
+| `ping()` | optional. With it the route's `heartbeat` runs; leave it out when the server keeps connections alive itself, and the app does not ping |
+| `bufferedAmount` | optional: bytes the server holds unsent |
+| `pause()`, `resume()` | optional: stop and start reading from the peer |
+
+And `accept()` gives back what the server tells the app. The functions need no `this`:
+
+| `WsEvents` | |
+| --- | --- |
+| `message(data, binary)` | one whole message, unmasked and put together from its fragments: text as a string (or its UTF-8 bytes), binary as bytes, which the app copies before it returns |
+| `close(code, reason)` | the connection is gone: 1005 for a close frame without a code, 1006 for none at all. Once |
+| `drain()` | the server can take more after a `send` that returned `false` |
+| `pong()` | a pong came |
+| `error(err)` | the socket failed; the route's `error` listeners hear it, and `close` still comes |
+
+The app keeps everything that has a meaning: the `message` and `send` contracts, `maxMessage`,
+the close codes 1003, 1007, 1008, 1009 and 1011, and 1001 when the app stops (`stopped()`).
+Backpressure goes through `drain`; past four times `maxMessage` (1 MiB at least) in
+`bufferedAmount`, the socket is cut off with 1008. The heartbeat runs when the transport can
+`ping`. When it can `pause`, the app stops reading while 16 messages wait unread (a handler
+that does not listen yet, an iterator that falls behind) and resumes once they are read. A
+transport that does not report the close within 3 seconds of the app's is cut off (1006) and
+counts as gone, so `stopped()` never waits for ever.
+
+`listen` and `upgradeListener` go through the same `accept` now, with the app's own RFC 6455
+framing on the Node socket as the transport, so the WebSocket tests on `node:http` cover it.
+The types are `WsUpgrade`, `WsRefusal`, `WsTransport` and `WsEvents`.
+
 ## Limits
 
 - **No permessage-deflate.** No extension is negotiated, so every frame goes as it is. No
   subprotocol is chosen either; a hook may set `sec-websocket-protocol`.
-- **Not on `app.fetch`.** Bun, Deno and serverless platforms upgrade their own way. `listen`
-  listens for upgrades when the app has a WebSocket route; a server of your own takes
-  `server.on("upgrade", app.upgradeListener)`, and [@inkanjs/uws](/docs/integrations/uws)
-  runs them on uWebSockets.js.
+- **Not on `app.fetch`.** A `fetch` handler has no socket to upgrade. `listen` listens for
+  upgrades when the app has a WebSocket route; a `node:http` server of your own takes
+  `server.on("upgrade", app.upgradeListener)`. A server with WebSockets of its own goes
+  through [`app.upgrade`](#on-a-server-with-websockets-of-its-own-appupgrade):
+  [@inkanjs/uws](/docs/integrations/uws) runs them on uWebSockets.js,
+  [@inkanjs/bun](/docs/integrations/bun) on `Bun.serve`.
 - **A message comes in at most 1024 frames**, each after the first counted 64 bytes against
   `maxMessage`; text is checked as UTF-8 frame by frame. A peer that floods pings without
   reading gets only its latest one answered.

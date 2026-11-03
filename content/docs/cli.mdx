@@ -1,16 +1,23 @@
 ---
 title: "CLI"
-description: "inkan check, diff, examples, seal and learn."
+description: "inkan check, diff, openapi, create, examples, seal and learn."
 ---
 
 ```sh
-npx inkan check   src/app.ts [--only <text>] [--json] [--strict]
+npx inkan check   src/app.ts [--only <text>] [--strict] [--format terminal|json|markdown]
 npx inkan openapi src/app.ts [-o openapi.json]
 npx inkan routes  src/app.ts
-npx inkan diff    openapi.json src/app.ts [--json]
+npx inkan diff    openapi.json src/app.ts [--format terminal|json|markdown]
 npx inkan seal    src/app.ts [-o src/inkan.seal.js]
+npx inkan create app [folder] [--store <s>] [--auth] [--frontend <f>] [--yes]
+npx inkan create plugin <name> [folder]
 npx inkan examples [name] [folder] [--list] [--force]
+npx inkan learn [folder] [--port <n>] [--force]
 ```
+
+The entry is the file that builds the app and exports it, as `export default app` or
+`export const app`. It may also export `beforeEach`, which `check` runs before every
+example, and [`untested`](/docs/examples#untested).
 
 `inkan diff` compares a saved OpenAPI document with the app (or two documents) and names
 what would break a client written against the old one: a route or status that is gone, a
@@ -18,6 +25,124 @@ field that is required now, a value a request may no longer send, a value an ans
 send now. Requests may only get looser and answers only stricter; it exits with `1` when
 something breaks, so CI can ask for a major version.
 
-Exit codes: `0` everything sealed, `1` something broke, `2` the command was
-used wrong. Colours turn off when the output is not a terminal or `NO_COLOR`
-is set; `FORCE_COLOR` turns them on.
+`inkan create app` is what `npm create inkan` runs; its options are on
+[Installation](/docs/installation#start-a-project). `inkan create plugin` writes a package for
+a plugin of your own, see [Publish a plugin](/docs/publish-a-plugin).
+
+## Formats
+
+`check` and `diff` write their result in one of three formats:
+
+| `--format` | |
+| --- | --- |
+| `terminal` | the default, for people, with colours when the output is a terminal |
+| `json` | for scripts. `--json` is short for it |
+| `markdown` | for a pull request comment or a job summary: a headline (`✓ no breaking changes`, or how many examples pass and fail), the changes as one table with the breaking ones first, and the examples that failed with what was answered and what was expected |
+
+`--json` together with `--format terminal` or `markdown` is a usage error. The Markdown is
+also there as `formatDiffMarkdown(changes)` and `formatReportMarkdown(report)` (experimental).
+
+`inkan diff --json` writes a list of changes, the breaking ones first:
+
+```json
+[
+  { "breaking": true, "kind": "route-removed", "where": "DELETE /teas/{id}", "message": "is gone" },
+  { "breaking": false, "kind": "route-added", "where": "GET /teas/{id}/reviews", "message": "is new" }
+]
+```
+
+`where` is `METHOD /path` as OpenAPI writes the path. `message` is for people, and its
+wording may change. `kind` is for machines: one of the 34 names of
+[`ChangeKind`](https://github.com/inkanjs/inkan/blob/main/src/openapi/diff.ts), such as
+`route-removed`, `status-removed`, `param-added-required`, `request-field-required`,
+`response-field-removed` or `response-value-added`. A new kind may come in a minor release, for
+a change that was not told apart before; an existing one keeps its name and meaning.
+
+`inkan check --json` writes the `CheckReport`: `{ ok, passed, failed, results, unchecked,
+uncovered, untested }`, each result `{ method, path, example, ok, status, ms, problems }`.
+`problems` are strings for people.
+
+## Exit codes
+
+| code | |
+| --- | --- |
+| `0` | all good |
+| `1` | the result failed: an example broke (with `--strict`, also a promised status no example shows), or a change breaks clients |
+| `2` | nothing was checked: a missing argument, an unknown option, an option without its value, a `--format` it does not know; or the entry did not load (no such file, it throws while loading or in `app.ready()`, it exports no app), a JSON file it cannot read, `-o` it cannot write |
+
+Before 0.9, a load error exited with `1`. Now `1` only means a check ran and failed. Colours
+turn off when the output is not a terminal or `NO_COLOR` is set; `FORCE_COLOR` turns them on.
+
+## Stable from 0.9
+
+Scripts and CI read the CLI, so from 0.9.0 these follow the same rules as the stable API
+(see [Stability](/docs/stability#the-command-line)):
+
+- the exit codes above, for `check`, `diff`, `openapi` and `routes`
+- `inkan openapi <entry> [-o <file>]`: the OpenAPI 3.1 document as JSON, to the file or to stdout
+- the JSON of `inkan diff --json` and `inkan check --json`
+- the flags `--json`, `--format`, `--strict`, `--only` and `-o`/`--out`
+
+New fields may be added to the JSON in a minor release; none is removed or changes its
+meaning. The terminal and Markdown text is for people and is not stable.
+
+## In CI
+
+[`inkanjs/check-action`](https://github.com/inkanjs/check-action) runs `check` and `diff` on a
+pull request. It compares the contract with the one on the base branch and leaves one comment,
+updated on every push, with the examples that broke and the changes that would break a client.
+The same report goes into the job summary.
+
+```yaml
+# .github/workflows/inkan.yml
+name: inkan
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write # for the comment; without it the report is in the job summary only
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - uses: inkanjs/check-action@v1
+        with:
+          entry: src/app.ts
+          openapi-file: openapi.json
+```
+
+| input | default | |
+| --- | --- | --- |
+| `entry` | (required) | the entry, relative to `working-directory` |
+| `working-directory` | `.` | where `package.json` and the entry live |
+| `base-ref` | the PR base | a branch or a commit to compare with; on `push`, the commit before |
+| `openapi-file` | | a document you commit (`npx inkan openapi src/app.ts -o openapi.json`). The base's copy is read with `git show`, so the base is not installed or built. Without it, the action builds the base |
+| `install` | `true` | `npm ci` (or `npm install` without a lockfile) before it runs |
+| `strict` | `false` | `inkan check --strict` |
+| `comment` | `true` | create or update the comment |
+| `fail-on-breaking` | `true` | fail the job on a breaking change; `false` makes it a warning |
+| `github-token` | `github.token` | the token for the comment |
+
+The outputs are `breaking` and `changes` (how many), `check-ok`, `compared` (whether there was
+a base) and `report` (the path of the Markdown). A failing example fails the job either way.
+
+From a fork, a pull request gets a read-only token, so the action writes the job summary only
+and no comment. The check and the diff still run and can still fail the job. Do not switch to
+`pull_request_target` to get the comment: it gives the fork's code a token that can write to
+your repository.
+
+Without the action it is three lines in a workflow, after `npm ci`, with `openapi.json`
+committed on `main`:
+
+```yaml
+- run: npx inkan check src/app.ts --strict
+- run: git show origin/main:openapi.json > base.json
+- run: npx inkan diff base.json src/app.ts
+```

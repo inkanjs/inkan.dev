@@ -316,6 +316,18 @@ options say, for an adapter that answers some requests itself (an upgrade, a fil
 without the app). Requests through `exchange`, `fetch` or `listen` are logged already. New
 in 0.8.0.
 
+## upgrade()
+
+```ts
+const r = await app.upgrade({ method, url, headers, remote });
+if (r.status === 101) r.accept(transport); // once the server's socket is open
+```
+
+A WebSocket upgrade for a server with WebSockets of its own: decided as `listen` decides it,
+then either a refusal to write as an answer or a 101 with `accept(transport)` and `cancel()`.
+[On a server with WebSockets of its own](/docs/websocket#on-a-server-with-websockets-of-its-own-appupgrade)
+has the whole of it. New in 0.9.0, experimental.
+
 ## inject()
 
 ```ts
@@ -335,6 +347,8 @@ const report = await app.check();
 ```
 
 Runs every route's examples against the app, as `inkan check` does from the command line.
+It takes `beforeEach`, `only`, `strict` and `untested` (statuses of a plugin's routes that no
+example shows on purpose, see [untested](/docs/examples#untested)).
 
 ## openapi(), routes(), sealed()
 
