@@ -44,7 +44,7 @@ export function Hanko() {
   const still = useReducedMotion();
   const on = seen || still;
   return (
-    <section id="hanko" data-tone="hanko" className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8">
+    <section id="hanko" data-tone="hanko" className="mx-auto w-full max-w-6xl overflow-x-clip px-5 py-24 sm:px-8">
       <div ref={ref} className="grid items-center gap-12 lg:grid-cols-[0.9fr_1.1fr]">
         <div>
           <p className="font-mono text-sm text-hot">印 hanko</p>
