@@ -1,0 +1,122 @@
+---
+title: "inkan 0.9: easier to find, try and adopt"
+description: "npm create inkan, WebSockets on any server through app.upgrade, a GitHub Action for check and diff, and a website that says when to pick something else."
+date: "2026-12-01"
+author: "Vensin"
+draft: true
+---
+
+{/* DRAFT, not published. Before release: set the real date above, remove `draft: true`, and
+    resolve every TODO below. Drafts are left out of the blog index, the sitemap and llms.txt,
+    and answer 404 on the live site. */}
+
+0.8 froze the API. With that done, what was missing was not another feature. It was the way
+in: how you start a project with inkan, and how you get it into the project you already have.
+So 0.9 is not about the framework doing more. It is about the distance between hearing of
+inkan and having it running in a real project, and I tried to make that shorter at every step.
+
+Nothing in 0.9 breaks the stable API. What is new is marked experimental, as always, until it
+has had a release or two to settle.
+
+## npm create inkan
+
+{/* TODO: the final package name. create-inkan if npm lets us have it, @inkanjs/create
+    (npm init @inkanjs) if not. Update every command in this section. */}
+
+```sh
+npm create inkan@latest my-api
+```
+
+It asks three things: where state goes (memory, PostgreSQL, Redis, MongoDB or MySQL), whether
+you want auth, and whether there is a frontend next to it (Next.js, Vite or none). Then it
+writes a project that runs: the app with a first route and its examples, the store wired up,
+a test that runs `app.check()` and an `inject` call, a CI workflow that runs
+`inkan check --strict`, and an `.env.example` with what the store needs.
+
+Without a terminal, or with `--yes`, it takes the defaults and asks nothing, which is what you
+want in a script:
+
+```sh
+npm create inkan@latest my-api -- --store postgres --auth --frontend vite --yes
+```
+
+{/* TODO: check the flag list against the final CLI (--store, --auth/--no-auth,
+    --frontend, --yes, --no-install, --pm). */}
+
+I kept the templates small on purpose. A generated project you have to clean up first is worse
+than an empty folder.
+
+## app.upgrade: WebSockets on any server
+
+{/* TODO: app.upgrade is experimental and its shape may still move before the release.
+    Check the names (accept, transport, the events) against the final API and the docs page. */}
+
+`app.ws()` routes have so far only worked on `node:http`. In 0.9 the socket part of inkan is
+split from the Node framing underneath it. `app.upgrade(request)` does everything inkan is
+responsible for (routing, the origin check, the connection limit, hooks, the input checks)
+and then either refuses with a normal answer or hands back an `accept(transport)` for the
+server underneath to call with its own socket. The message contracts, the close codes and
+the heartbeat stay in inkan.
+
+The Node path goes through the same `accept()` now, so the existing WebSocket tests cover the
+split. What this opens up is the adapters:
+
+{/* TODO: only claim what has shipped by release day. @inkanjs/uws on app.upgrade, and
+    @inkanjs/bun with Bun.serve's websocket, were planned as a separate step after 0.9.0. */}
+
+- `@inkanjs/uws` moves onto `app.upgrade`, and loses the workaround it needed before.
+- `@inkanjs/bun` gets WebSocket routes through `Bun.serve`.
+- Deno is next, in 0.10.
+
+## A GitHub Action for check and diff
+
+{/* TODO: the final repository name and version tag (inkanjs/check-action@v1?), and the
+    input names, once the action is published. */}
+
+I wrote about [check and diff](/blog/check-and-diff) recently, and about the three lines of
+CI I use for them. There is now an action that does those lines and a bit more:
+
+```yaml
+- uses: inkanjs/check-action@v1
+  with:
+    entry: src/app.ts
+    openapi-file: openapi.json
+```
+
+On a pull request it runs `inkan check`, compares the contract with the one on the base
+branch, and leaves one comment that it updates on every push: which examples broke, and which
+changes would break a client. The same text goes into the job summary. It fails the job on a
+breaking change unless you tell it not to. For pull requests from forks it only writes the
+summary, because a fork does not get a token that can comment, and I would rather it did less
+than tell you to use `pull_request_target`.
+
+## The website
+
+This site got the things I kept being asked for:
+
+- [A comparison](/docs/compare) with Express, Fastify and Hono. Not a feature table: what
+  each one is best at and when I would pick it over inkan, plus the benchmark numbers side by
+  side.
+- Migration guides [from Express](/docs/migrate/express) and
+  [from Fastify](/docs/migrate/fastify), part by part, both versions next to each other, and
+  how to move one route at a time inside the app you already run.
+- `llms.txt` and `llms-full.txt`, so a model you ask about inkan reads the current docs
+  instead of guessing.
+- This blog.
+
+## Upgrading
+
+{/* TODO: confirm there is nothing to do once the CHANGELOG is final. */}
+
+```sh
+npm install @vxnsin/inkan@0.9
+```
+
+There is nothing to change. If you maintain a plugin, its `inkan: ">=0.8.0 <1.0.0"` range
+already covers 0.9.
+
+{/* TODO: link the CHANGELOG entry for 0.9.0 and, if the bench was rerun, the new report. */}
+
+As always, the [CHANGELOG](https://github.com/inkanjs/inkan/blob/main/CHANGELOG.md) has the
+full list. If something does not work the way this post says, that is a bug, and I would like
+to hear about it in the [issues](https://github.com/inkanjs/inkan/issues).
