@@ -1,0 +1,121 @@
+---
+title: "inkan 0.9: easier to find, try and adopt"
+description: "npm create inkan, WebSockets on any server through app.upgrade, a GitHub Action for check and diff, and a website that says when to pick something else."
+date: "2026-11-03"
+author: "Vensin"
+---
+
+0.8 froze the API. With that done, what was missing was not another feature. It was the way
+in: how you start a project with inkan, and how you get it into the project you already have.
+So 0.9 is not about the framework doing more. It is about the distance between hearing of
+inkan and having it running in a real project, and I tried to make that shorter at every step.
+
+Nothing in 0.9 breaks the stable API. What is new is marked experimental, as always, until it
+has had a release or two to settle.
+
+## npm create inkan
+
+```sh
+npm create inkan@latest my-api
+```
+
+It asks three things: where state goes (memory, PostgreSQL, Redis, MongoDB or MySQL), whether
+you want auth, and whether there is a frontend next to it (Next.js, Vite or none). Then it
+writes a project that runs: the app with a first route and its examples, the store wired up,
+a test that runs `app.check()` and an `inject` call, a CI workflow that runs
+`inkan check --strict`, and an `.env.example` with what the store needs.
+
+Without a terminal, or with `--yes`, it takes the defaults and asks nothing, which is what you
+want in a script:
+
+```sh
+npm create inkan@latest my-api -- --store postgres --auth --frontend vite --yes
+```
+
+I kept the templates small on purpose. A generated project you have to clean up first is worse
+than an empty folder.
+
+## app.upgrade: WebSockets on any server
+
+`app.ws()` routes have so far only worked on `node:http`. In 0.9 the socket part of inkan is
+split from the Node framing underneath it. `app.upgrade(request)` does everything inkan is
+responsible for (routing, the origin check, the connection limit, hooks, the input checks)
+and then either refuses with a normal answer or hands back an `accept(transport)` for the
+server underneath to call with its own socket. The message contracts, the close codes and
+the heartbeat stay in inkan.
+
+The Node path goes through the same `accept()` now, so the existing WebSocket tests cover the
+split. What this opens up is the adapters:
+
+- `@inkanjs/uws` 0.5 moves onto `app.upgrade`, and loses the workaround it needed before.
+- `@inkanjs/bun` 0.1 is new: `serve(app)` on `Bun.serve`, WebSocket routes included.
+- Deno is next.
+
+## A GitHub Action for check and diff
+
+I wrote about [check and diff](/blog/check-and-diff) recently, and about the three lines of
+CI I use for them. There is now an action that does those lines and a bit more:
+
+```yaml
+- uses: inkanjs/check-action@v1
+  with:
+    entry: src/app.ts
+    openapi-file: openapi.json
+```
+
+On a pull request it runs `inkan check`, compares the contract with the one on the base
+branch, and leaves one comment that it updates on every push: which examples broke, and which
+changes would break a client. The same text goes into the job summary. It fails the job on a
+breaking change unless you tell it not to. For pull requests from forks it only writes the
+summary, because a fork does not get a token that can comment, and I would rather it did less
+than tell you to use `pull_request_target`.
+
+## The CLI, for machines and for pull requests
+
+`inkan check` and `inkan diff` take `--format terminal|json|markdown`. Markdown is what the
+action above posts: a headline, the changes as one table with the breaking ones first, and the
+examples that failed. Every change in the diff has a `kind` now (`route-removed`,
+`response-field-removed` and 32 more), next to the message for people. The JSON of both
+commands and the exit codes are stable from 0.9: 0 all good, 1 a check failed or a change
+breaks clients, 2 the entry did not load or an option was wrong.
+
+And a route can say that it promises a status no example shows, on purpose:
+`untested: { 429: "rate limits are tested in the store's own tests" }`. `inkan check --strict`
+lists it with its reason instead of failing. That is what let the projects from
+`npm create inkan --auth` run `--strict` from the first commit.
+
+## Speed
+
+Nothing in 0.9 is on the request path, and the bench agrees: on the runner inkan scores 89.4
+against Fastify's 87.2, ahead in all three runs and level with 0.8. The numbers are on
+[the benchmarks page](/benchmarks) and in the
+[0.9.0 report](https://github.com/inkanjs/inkan/blob/main/bench/reports/0.9.0.md).
+
+## The website
+
+This site got the things I kept being asked for:
+
+- [A comparison](/docs/compare) with Express, Fastify and Hono. Not a feature table: what
+  each one is best at and when I would pick it over inkan, plus the benchmark numbers side by
+  side.
+- Migration guides [from Express](/docs/migrate/express) and
+  [from Fastify](/docs/migrate/fastify), part by part, both versions next to each other, and
+  how to move one route at a time inside the app you already run.
+- `llms.txt` and `llms-full.txt`, so a model you ask about inkan reads the current docs
+  instead of guessing.
+- This blog.
+
+## Upgrading
+
+```sh
+npm install @vxnsin/inkan@0.9
+```
+
+There is nothing to change in your code. One thing for CI scripts: the CLI now exits with 2,
+not 1, when the entry does not load or an option is wrong, so 1 means only that a check
+failed. If you maintain a plugin, its `inkan: ">=0.8.0 <1.0.0"` range
+already covers 0.9.
+
+As always, the [CHANGELOG](https://github.com/inkanjs/inkan/blob/main/CHANGELOG.md) has the
+full list. If something does not work the way this post says, that is a bug, and I would like
+to hear about it in the [issues](https://github.com/inkanjs/inkan/issues).

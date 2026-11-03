@@ -53,6 +53,10 @@ export function Bench() {
         and every one of those inkan requests was validated, typed and trimmed to its contract.{" "}
         <Link href="/docs/performance" className="text-hot underline underline-offset-4">
           how it is measured →
+        </Link>{" "}
+        ·{" "}
+        <Link href="/docs/compare" className="text-hot underline underline-offset-4">
+          when to pick which →
         </Link>
       </p>
     </section>

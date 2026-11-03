@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { direct } from "@inkanjs/next";
@@ -9,7 +10,14 @@ import { Playground } from "@/components/landing/playground";
 import { Clips } from "@/components/landing/clips";
 import { Bench, Integrations, Learn } from "@/components/landing/sections";
 import { Hanko } from "@/components/landing/hanko";
+import { pageMeta } from "@/lib/site";
 import { app } from "@/server/app";
+
+export const metadata: Metadata = pageMeta({
+  description:
+    "One contract per route gives you validation, types, OpenAPI, docs and tests. Runs on node:http, Bun, Deno and serverless, with no dependencies.",
+  path: "/",
+});
 
 /** A Server Component that asks the site's own API, in the same process, through direct(app). */
 async function Shelf() {

@@ -4,11 +4,13 @@ import { Code } from "@/components/code";
 import { Footer, Nav } from "@/components/landing/chrome";
 import { Smooth } from "@/components/landing/smooth";
 import { run, scenarios, servers } from "@/data/bench";
+import { pageMeta } from "@/lib/site";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "Benchmarks",
   description: "inkan against node:http, Fastify, Hono and Express: every scenario, how it is measured, and how to run it yourself.",
-};
+  path: "/benchmarks",
+});
 
 const by = (name: string) => servers.find((s) => s.name === name)!;
 const times = (a: number, b: number) => `${(a / b).toFixed(1)}×`;
@@ -83,7 +85,7 @@ export default function Benchmarks() {
           <div>
             <h2 className="font-mono text-2xl font-extrabold">A range, not a rank</h2>
             <p className="mt-4 text-soft">
-              A run on another day moves each server by a few points. On node:http inkan is level with Fastify or a little ahead: in front in two of the three runs of the 0.8.0 bench, level in the third, and not in every scenario. inkan also does a bit more per
+              A run on another day moves each server by a few points. On node:http inkan is a little ahead of Fastify: in front in all three runs of the 0.9.0 bench, by about two points, and not in every scenario. inkan also does a bit more per
               request than the others: an id for every request, and every key an answer&apos;s contract does not list kept
               back.
             </p>

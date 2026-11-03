@@ -89,6 +89,16 @@ examples: [
 The docs page shows them, and `inkan check` runs every one as a test. See
 [Examples are tests](/docs/examples).
 
+## untested
+
+```ts
+untested: { 429: "a lockout takes many failed logins" }
+```
+
+Statuses in `response` that no example shows, on purpose, each with its reason.
+`inkan check --strict` lists them instead of failing on them. Experimental. See
+[Examples are tests](/docs/examples#untested).
+
 ## security
 
 ```ts

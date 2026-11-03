@@ -1,0 +1,135 @@
+---
+title: "How inkan check and diff keep your API contracts honest"
+description: "Two commands, one for the server and one for its clients: why I built them, what they catch, and how to run them in CI."
+date: "2026-11-03"
+author: "Vensin"
+---
+
+Every API I have worked on had documentation that was wrong somewhere. Not on purpose. Somebody
+renamed a field, added a required header, or stopped sending a 404 and started sending an
+empty 200, and the docs stayed as they were because nothing tied them to the code. The first
+person to notice was usually someone on another team, a week later, with a broken page.
+
+inkan exists mostly because of that. A route carries its contract (params, query, body, the
+answers per status, a few examples), and the docs page, the OpenAPI document and the types
+all come from it. That alone does not keep anything honest, though. A contract is only worth
+something if a machine checks it. That is what `inkan check` and `inkan diff` are for, and
+they check two different promises.
+
+## check: does the server do what the contract says?
+
+The examples on a route are what the docs page shows. They are also tests:
+
+```ts
+app.get("/teas/:id", {
+  params: t.object({ id: t.int() }),
+  response: { 200: Tea, 404: t.problem() },
+  examples: [
+    { name: "found", params: { id: 1 }, expect: { name: "Sencha" } },
+    { name: "missing", params: { id: 99 }, status: 404 },
+  ],
+}, ({ params, notFound }) => teas.get(params.id) ?? notFound());
+```
+
+`npx inkan check src/app.ts` loads the app, sends every example straight into it (no port,
+no network) and compares the answer with what the example expects: the status, the fields
+in `expect`, and the whole body against the response schema of that status. Say the 404
+got lost in a refactor:
+
+```sh
+$ npx inkan check src/app.ts
+
+  印 inkan check  ·  Tea Shop 1.0.0
+
+  GET    /teas/:id
+    ✓ found                              200  0.8ms
+    ✗ missing                            200  0.4ms
+        answered 200, expected 404
+
+  2 examples · 1 sealed · 1 broken
+```
+
+It exits with 1, so CI goes red. The docs page would have shown a 404 for that example. Now
+it cannot, because the build that would publish the wrong page does not pass.
+
+Two things I added after using it for a while. First, routes without a single example are
+listed at the end. Nothing holds those to their contract, and I would rather see the list
+than pretend the run covered everything. Second, `--strict`: a route that promises a status
+in `response` but has no example that answers with it fails the run. If your contract says
+"this can be a 409", something should show that it is.
+
+Examples can build on each other (create a tea, keep its id, fetch it), share cookies across
+a chain like a browser would, and reset data with a `beforeEach` you export next to the app.
+The [examples page](/docs/examples) has the details. The point is that the test you write is
+the documentation people read, so there is one thing to keep up to date instead of two.
+
+## diff: will the clients still work?
+
+`check` tells you the server matches its contract today. It says nothing about whether
+today's contract is one your clients can live with. If I make `kind` a required field of
+`POST /teas`, the server and its contract agree perfectly, and every client that does not
+send `kind` breaks.
+
+`inkan diff` compares two contracts: the one you shipped and the one you have now.
+
+```sh
+npx inkan openapi src/app.ts -o openapi.json   # once, and commit it
+npx inkan diff openapi.json src/app.ts         # on every change
+```
+
+The rule it applies is simple, and I think it is the right one. A request may only get
+looser: a new optional field is fine, a new required one is not; a field that took any string
+and now only takes three values breaks someone. An answer may only get stricter: a field that
+was always there and now may be missing breaks someone; an enum that gains a value breaks a
+client with a `switch` over it. A route or a status that is gone breaks clients. A new route,
+a new optional parameter, a field the answer sends now: safe.
+
+```sh
+$ npx inkan diff openapi.json src/app.ts
+
+  印 inkan diff  ·  openapi.json → src/app.ts
+
+  breaks clients
+    ✗ POST /teas  body.kind is required now
+    ✗ GET /teas/{id}  the 200 answer.kind may be "white" now
+
+  safe
+    · GET /teas  takes the query parameter page now
+
+  2 breaking · 1 safe
+```
+
+It exits with 1 when anything breaks. That does not mean you may not do it. It means the
+change should be a decision: a new major version, a deprecation period, or a second route.
+What I wanted to get rid of was the breaking change nobody noticed.
+
+`diff` works on OpenAPI documents, so either side can be a file. Two saved documents, the
+last release against a branch, or a document some other tool wrote: it only needs the
+`paths` and the schemas.
+
+## In CI
+
+The setup I use is three lines in a workflow, after `npm ci`:
+
+```yaml
+- run: npx inkan check src/app.ts --strict
+- run: git show origin/main:openapi.json > base.json
+- run: npx inkan diff base.json src/app.ts
+```
+
+The first holds the server to its docs. The second and third hold the contract to what is
+already out there: `openapi.json` on `main` is the contract the last release shipped, and the
+branch is compared against it. When a breaking change is intended, I regenerate and commit
+`openapi.json` in the same pull request, so the change to the contract is part of the review
+and not something that happened on the side.
+
+Both commands take `--json` if you want to do something else with the result, like post it
+on the pull request.
+
+## What it does not catch
+
+I want to be clear about the limits. `check` runs the examples you wrote, and nothing else; a
+route with one happy-path example is checked on that one path. `diff` sees what OpenAPI can
+express, so a change in meaning that keeps the shape (a price that used to be in euros and is
+now in cents) passes. Neither replaces thinking about your clients. They take care of the
+mechanical part, which in my experience is where most of the broken pages came from.

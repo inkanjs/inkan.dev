@@ -7,12 +7,13 @@ description: "Examples show up in the docs and run as tests."
 npx inkan check src/app.ts            # every route
 npx inkan check src/app.ts --only /teas
 npx inkan check src/app.ts --json     # for CI
+npx inkan check src/app.ts --format markdown   # for a pull request comment
 npx inkan check src/app.ts --strict   # a promised status without an example fails too
 ```
 
 A route that promises a 404 no example ever shows is listed under the route,
 and on the docs page. Nothing tests that 404 yet; `--strict` turns it into a
-failure.
+failure, unless the route says it is [untested on purpose](#untested).
 
 The entry file exports the app (`export default app` or `export const app`).
 `app.listen()` stays quiet while the CLI loads it. If the examples change data,
@@ -36,6 +37,49 @@ test("the contract holds", async () => {
   assert.equal(report.failed, 0);
 });
 ```
+
+## untested
+
+Some statuses no example can show: a 429 after many failed logins, a 503 when the database
+is down. A route says so, with the reason, and `--strict` lets them be:
+
+```ts
+app.post(
+  "/login",
+  {
+    body: Login,
+    response: { 200: Session, 401: t.problem(), 429: t.problem() },
+    examples: [
+      { name: "signed in", body: { name: "ana", password: "tea" } },
+      { name: "wrong password", body: { name: "ana", password: "coffee" }, status: 401 },
+    ],
+    untested: { 429: "a lockout takes many failed logins" },
+  },
+  login,
+);
+```
+
+`inkan check --strict` lists the 429 under the route with its reason, as "not demonstrated,
+on purpose", and does not fail on it. An example that does answer with it still counts. The
+report has them in `untested`, each `{ method, path, status, reason }`.
+
+Routes the app does not write itself, a plugin's, take the same from the entry. The CLI reads
+`export const untested` as it reads `beforeEach`, keyed by `METHOD /path`:
+
+```ts
+export const untested = {
+  "POST /auth/login": { 429: "a lockout after many failed logins" },
+  "POST /auth/logout": { 403: "a logout from another site" },
+};
+```
+
+In your own tests, hand it to `app.check()`:
+
+```ts
+const report = await app.check({ beforeEach, untested, strict: true });
+```
+
+`untested` is experimental.
 
 ## Examples that build on each other
 

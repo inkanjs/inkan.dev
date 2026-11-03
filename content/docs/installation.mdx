@@ -12,6 +12,57 @@ The package is scoped because npm keeps the plain name `inkan` free of look-alik
 Node 22 or newer. On Node 22.18 and newer, `.ts` files run as they are,
 with no build step and no loader.
 
+## Start a project
+
+```sh
+npm create inkan@latest my-api
+```
+
+It asks three things: where the data lives, whether you want logins, and whether a frontend
+goes next to the API. Then it writes the project into `my-api` and installs it. Flags answer
+the questions before they are asked (with npm, they go after `--`):
+
+```sh
+npm create inkan@latest my-api -- --store postgres --auth --frontend vite
+```
+
+| option | |
+| --- | --- |
+| `--store memory\|postgres\|redis\|mongo\|mysql` | where the data lives. `memory` (the default) needs nothing; the others go through `@inkanjs/postgres`, `redis`, `mongo` or `mysql` |
+| `--auth`, `--no-auth` | logins and sessions from `@inkanjs/auth` (default: none) |
+| `--frontend none\|next\|vite` | a Next.js or Vite frontend, with the API under `/api` through `@inkanjs/next` or `@inkanjs/vite` (default: none) |
+| `--pm npm\|pnpm\|yarn\|bun` | who installs, and what the CI workflow uses. By default the one that ran the command |
+| `--no-install` | write the files, install nothing |
+| `--yes`, `-y` | ask nothing: the defaults for whatever the flags leave open |
+| `--force` | write into a folder that is not empty |
+
+Without a terminal to ask in, it takes the defaults as well, so it works in a script.
+`npm create inkan` runs `inkan create app` of the inkan with the same version; with inkan
+installed, `npx inkan create app my-api` does the same.
+
+What you get:
+
+- `src/app.ts` builds the app and exports it, without listening: a health route and a small
+  notes API, each with its contract and its examples.
+- `src/store.ts` is where the data lives. Swap the store there and nothing else changes.
+- `src/server.ts` is the one file that opens a port. With Next.js there is none: `next start`
+  serves the API through `app/api/[...path]/route.ts`.
+- `test/` runs every example as a test (`app.check` with `strict`) and the cases examples
+  are not for (`app.inject`).
+- `.github/workflows/ci.yml` starts the database, if there is one, and runs the typecheck,
+  `inkan check --strict` and the tests, with the same package manager.
+- `.env.example` with what the store needs, and a README that says what is where and what to
+  change first.
+
+With a frontend, the API's files move out of its way: to `server/` with Next.js, to
+`src/server/` with Vite. Every combination passes `inkan check --strict` and its own tests as
+it comes. With `--auth`, the app exports an [`untested`](/docs/examples#untested) for the few
+statuses the auth plugin promises that no single example can show.
+
+<Callout type="warn" title="Experimental">
+  The generated files may change in any release.
+</Callout>
+
 **New here? Start with the tutorial.** It runs in your terminal, offline:
 
 ```sh

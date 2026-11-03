@@ -1,11 +1,12 @@
 ---
 title: "Stability"
-description: "What stays as it is from 0.8.0, what may still change, and the names that changed in 0.8.0."
+description: "What stays as it is from 0.8.0, what became stable in 0.9.0, what may still change, and the names that changed in 0.8.0."
 ---
 
 From 0.8.0 the API of inkan is frozen. Code written against a stable part keeps working, in
 meaning as well as in name, until the next major release. What is still finding its shape
-is marked experimental and says so in its types.
+is marked experimental and says so in its types. From 0.9.0 the same goes for what scripts
+and CI read from the [command line](#the-command-line).
 
 ## The policy
 
@@ -48,12 +49,44 @@ every change to the API shows up in review.
 | the rest | `Layout`, `TrustProxy`, `CacheRule`, `fileExample`, `env`, `Store`, `memoryStore` |
 | `@vxnsin/inkan/client` | `client`, `Client`, `ClientOptions`, `Answer`, `Input`, `Jsonify`, `StreamError` |
 
+## The command line
+
+From 0.9.0 the CLI follows the same rules, for what scripts and CI read from it:
+
+- **The exit codes** of `inkan check`, `inkan diff`, `inkan openapi` and `inkan routes`. `0` all
+  good. `1` the result failed: an example broke (with `--strict`, also a promised status no
+  example shows), or a change breaks clients. `2` nothing was checked: a usage error (a missing
+  argument, an unknown option, an option without its value, a `--format` it does not know) or
+  a load error (no such file, the entry throws while it loads or in `app.ready()`, it exports
+  no app, a JSON file it cannot read, `-o` it cannot write).
+- **`inkan openapi <entry> [-o <file>]`**: the app's OpenAPI 3.1 document as JSON, to the file
+  or to stdout.
+- **`inkan diff <before> <after> --json`** (or `--format json`): a JSON array of
+  `{ breaking, kind, where, message }`, the breaking ones first. `where` is `METHOD /path` as
+  OpenAPI writes the path, and `kind` is one of `ChangeKind`. `message` is for people, and its
+  wording may change. New kinds may come in a minor release, for changes that were not told
+  apart before; an existing kind keeps its name and meaning.
+- **`inkan check <entry> --json`** (or `--format json`): a `CheckReport`, `{ ok, passed, failed,
+  results, unchecked, uncovered, untested }`, each result `{ method, path, example, ok, status,
+  ms, problems }`. `problems` is a list of strings for people, worded as they may be.
+- **The flags** `--json`, `--format terminal|json|markdown`, `--strict`, `--only` and `-o`/`--out`.
+
+New fields may be added to these objects in a minor release; none is removed or changes its
+meaning. The terminal and Markdown text is for people and is not stable. See [CLI](/docs/cli).
+
 ## Experimental
 
 These work and are tested, and may still change in a minor release:
 
+- [`npm create inkan`](/docs/installation#start-a-project) and `inkan create app`: the
+  generated files may change in any release
+- [`untested`](/docs/examples#untested) on a route, and `CheckOptions.untested` (with the CLI
+  reading an entry's `export const untested`)
+- `formatDiffMarkdown`, `formatReportMarkdown`, `ChangeKind`
 - [jobs](/docs/jobs): `job`, the `Job*` types, the `schedule` option
 - [WebSockets](/docs/websocket): `ws`, the `Ws*` types, `client.ws`, `upgradeListener`, the app's `ws` option
+- [`app.upgrade`](/docs/websocket#on-a-server-with-websockets-of-its-own-appupgrade) and its
+  types for adapters: `WsUpgrade`, `WsRefusal`, `WsTransport`, `WsEvents`
 - `client.events`
 - [`pressure`](/docs/runtime#pressure-overload-protection): the option, `app.pressure()`, the `Pressure*` types
 - [`currentContext()`](/docs/runtime#currentcontext-the-request-anywhere) and the `context` option

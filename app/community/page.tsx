@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/site";
 import { Suspense } from "react";
 import { People } from "@/components/community/people";
 import { Footer, Nav } from "@/components/landing/chrome";
@@ -6,10 +7,11 @@ import { Smooth } from "@/components/landing/smooth";
 import { contributors, numbers, PACKAGES } from "@/lib/community";
 import { sponsors } from "@/data/sponsors";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "Community",
   description: "The people who build inkan, and how to join them.",
-};
+  path: "/community",
+});
 
 async function Numbers() {
   const [n, people] = await Promise.all([numbers(), contributors()]);
