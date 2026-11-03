@@ -5,11 +5,13 @@ import { Catalog } from "@/components/hanko/catalog";
 import { Footer, Nav } from "@/components/landing/chrome";
 import { Smooth } from "@/components/landing/smooth";
 import { allHanko } from "@/lib/hanko";
+import { pageMeta } from "@/lib/site";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "Hanko",
   description: "Everything that stamps onto inkan: what is in the core, the official middleware, the integrations, recipes and community plugins.",
-};
+  path: "/hanko",
+});
 
 const PACKAGE = `// package.json
 {

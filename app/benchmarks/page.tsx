@@ -4,11 +4,13 @@ import { Code } from "@/components/code";
 import { Footer, Nav } from "@/components/landing/chrome";
 import { Smooth } from "@/components/landing/smooth";
 import { run, scenarios, servers } from "@/data/bench";
+import { pageMeta } from "@/lib/site";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "Benchmarks",
   description: "inkan against node:http, Fastify, Hono and Express: every scenario, how it is measured, and how to run it yourself.",
-};
+  path: "/benchmarks",
+});
 
 const by = (name: string) => servers.find((s) => s.name === name)!;
 const times = (a: number, b: number) => `${(a / b).toFixed(1)}×`;
