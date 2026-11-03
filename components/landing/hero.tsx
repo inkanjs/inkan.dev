@@ -98,7 +98,7 @@ export function Hero() {
 
   return (
     <section data-tone="hero" className="relative mx-auto grid w-full max-w-6xl items-center gap-12 px-5 pb-20 pt-16 sm:px-8 lg:grid-cols-[1.05fr_1fr] lg:pt-24">
-      <div>
+      <div className="min-w-0">
         <div className="relative mb-8 h-24 w-24">
           {/* the ink that spreads where the seal lands */}
           <AnimatePresence>
@@ -182,6 +182,7 @@ export function Hero() {
         initial={still ? false : { opacity: 0, x: 40, rotate: 1.5 }}
         animate={{ opacity: 1, x: 0, rotate: 0 }}
         transition={{ delay: 0.55, duration: 0.9, ease }}
+        className="min-w-0"
       >
         <Session />
       </motion.div>
