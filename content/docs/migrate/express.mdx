@@ -1,0 +1,287 @@
+---
+title: "From Express"
+description: "Routes, validation, middleware, routers, error handling and tests from Express to inkan, side by side, one route at a time."
+---
+
+Most of an Express app maps onto inkan one to one. What changes is where the shape of the
+data lives: in Express it is spread over validation middleware, TypeScript casts and a
+separate OpenAPI file; in inkan it is the contract of the route, and the rest is made from it.
+
+## One route at a time
+
+You do not have to move everything at once. `app.listener` is a plain Node `(req, res)`
+function, so the inkan app can sit inside the Express app under a prefix and take over routes
+as you move them:
+
+```ts title="server.ts" notwoslash
+import express from "express";
+import { app } from "./app.ts"; // the inkan app
+
+await app.ready();                // every plugin loaded
+
+const legacy = express();
+legacy.use("/v2", app.listener);  // before express.json(): inkan reads its own bodies
+legacy.use(express.json());
+legacy.use(oldRoutes);
+legacy.listen(3000);
+```
+
+Express strips `/v2` before it hands the request on, so the inkan routes are written without
+it (`/teas/:id` answers `/v2/teas/:id`). Mount it before `express.json()` and other body
+parsers: a body Express has read is gone for inkan. When the last route has moved, drop
+Express and call `app.listen()`.
+
+## Routes
+
+<Side>
+```ts title="Express" notwoslash
+app.get("/teas/:id", (req, res) => {
+  const tea = teas.get(Number(req.params.id));
+  if (!tea) return res.status(404).json({ error: "not found" });
+  res.json(tea);
+});
+
+app.post("/teas", (req, res) => {
+  const tea = teas.add(req.body);
+  res.status(201).location(`/teas/${tea.id}`).json(tea);
+});
+```
+
+```ts title="inkan"
+app.get("/teas/:id", { params: t.object({ id: t.int() }) }, ({ params, notFound }) =>
+  teas.get(params.id) ?? notFound(),
+);
+
+app.post("/teas", { body: NewTea, response: { 201: Tea } }, ({ body, reply }) => {
+  const tea = teas.add(body);
+  return reply(201, tea, { location: `/teas/${tea.id}` });
+});
+```
+</Side>
+
+A handler returns its answer instead of calling `res.json()`: a value becomes JSON, a string
+text, a stream a stream. `status()`, `header()`, `redirect()`, `setCookie()` and the rest are
+on the [context](/docs/api/context), next to `params`, `query`, `headers`, `body` and
+`cookies`. Path syntax is the same for params (`:id`); the rest of a path is `*name`
+(`/files/*path`), read as `params.path`.
+
+## Validation and types
+
+In Express the check and the type are two things you keep in step by hand. In inkan the schema
+is both:
+
+<Side>
+```ts title="Express + zod" notwoslash
+const NewTea = z.object({
+  name: z.string().min(1),
+  grams: z.number().int().min(1),
+});
+
+app.post("/teas", (req, res) => {
+  const parsed = NewTea.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json(parsed.error.issues);
+  res.status(201).json(teas.add(parsed.data));
+});
+
+app.get("/teas", (req, res) => {
+  const page = Number(req.query.page ?? 1); // a string, or a list, or nothing
+  res.json(teas.page(page));
+});
+```
+
+```ts title="inkan"
+const NewTea = t.object({
+  name: t.string().min(1),
+  grams: t.int().min(1),
+});
+
+app.post("/teas", { body: NewTea, response: { 201: Tea } }, ({ body, reply }) =>
+  reply(201, teas.add(body)), // body is typed, and was checked
+);
+
+app.get("/teas", { query: t.object({ page: t.int().default(1) }) }, ({ query }) =>
+  teas.page(query.page), // a number
+);
+```
+</Side>
+
+Params, query and headers come in as text and are turned into what the schema asks for. A
+request that does not fit gets one 400 that lists every issue, before the handler runs. The
+same schemas write the OpenAPI document at `/openapi.json` and the docs page at `/docs`, so
+there is no separate spec to forget. In development the answer is checked against `response`
+too, and keys the contract does not list are dropped, so a `passwordHash` cannot leave by
+accident. [Schemas](/docs/schemas) has every type and rule.
+
+## Middleware
+
+<Side>
+```ts title="Express" notwoslash
+app.use((req, res, next) => {
+  const started = Date.now();
+  res.on("finish", () => {
+    console.log(req.method, req.url, Date.now() - started);
+  });
+  next();
+});
+
+app.use((req, res, next) => {
+  if (!req.headers.authorization) return res.sendStatus(401);
+  res.locals.user = users.fromToken(req.headers.authorization);
+  next();
+});
+```
+
+```ts title="inkan"
+app.use(async (ctx, next) => {
+  const started = Date.now();
+  await next();
+  ctx.header("server-timing", `app;dur=${Date.now() - started}`);
+});
+
+app
+  .security("bearer") // a 401 without it, and a lock in the docs
+  .decorateRequest("user", (ctx) => users.fromToken(ctx.headers.authorization!));
+```
+</Side>
+
+`app.use(async (ctx, next) => …)` is middleware in the Koa style: `await next()` runs the
+rest, and the code after it sees the answer. Request logging is built in (`log: "pretty"` in
+development, `"json"` in production), so the first one above is often not needed at all.
+`res.locals` becomes `ctx.state`, or better a typed decoration: `decorateRequest` makes the
+value the first time a request reads `ctx.user`. For checks at fixed points there are
+[hooks](/docs/hooks): `onRequest` before the body is read, `preHandler` after it is checked.
+
+Express middleware packages do not run in inkan. Most have a counterpart:
+
+| Express | inkan |
+| --- | --- |
+| `express.json()`, `express.urlencoded()`, multer | built in: JSON, forms and multipart are read by the route's `body` |
+| `cors` | [`cors()`](/docs/built-in/cors) |
+| `express-rate-limit` | [`rateLimit()`](/docs/built-in/rate-limit) |
+| `compression` | [`compress()`](/docs/built-in/compress) |
+| `express.static` | [`serveStatic()`](/docs/built-in/static) |
+| `helmet` | [`@inkanjs/secure-headers`](/docs/official/secure-headers) |
+| `express-session`, `cookie-session` | [`@inkanjs/session`](/docs/official/session) |
+| `passport`, `express-jwt` | [`@inkanjs/auth`](/docs/official/auth) |
+| `http-proxy-middleware` | [`@inkanjs/proxy`](/docs/official/proxy) |
+| `swagger-ui-express`, `swagger-jsdoc` | built in: `/openapi.json` and `/docs` |
+
+## Routers
+
+<Side>
+```ts title="Express" notwoslash
+const admin = express.Router();
+admin.use(requireAdmin);
+admin.get("/stats", (req, res) => res.json(stats()));
+
+app.use("/admin", admin);
+```
+
+```ts title="inkan"
+const admin = routes()
+  .use(requireAdmin)
+  .get("/stats", () => stats());
+
+app.mount("/admin", admin);
+```
+</Side>
+
+`routes()` is a group with its own middleware; `mount` puts it under a prefix, and the typed
+client knows its routes. When the group needs hooks, decorations or options of its own, make it
+a [plugin](/docs/plugins) and `register` it with `{ prefix: "/admin" }`. For a large API, one
+file per path works too: [routes from the file tree](/docs/middleware#routes-from-the-file-tree).
+
+## Errors
+
+<Side>
+```ts title="Express" notwoslash
+app.get("/teas/:id", async (req, res) => {
+  const tea = await teas.get(req.params.id);
+  if (!tea) throw new NotFound("tea");
+  res.json(tea);
+});
+
+app.use((req, res) => res.status(404).json({ error: "no route" }));
+
+app.use((err, req, res, next) => {
+  if (err instanceof NotFound) return res.status(404).json({ error: err.message });
+  report(err);
+  res.status(500).json({ error: "internal" });
+});
+```
+
+```ts title="inkan"
+app.get("/teas/:id", { params: t.object({ id: t.int() }) }, async ({ params }) => {
+  const tea = await teas.get(params.id);
+  if (!tea) throw problem(404, "tea-not-found", `No tea ${params.id}`);
+  return tea;
+});
+
+app.onProblem((ctx, p) => {
+  if (p.status === 404 && p.type === "not-found") p.detail = "Nothing here. Try /docs";
+});
+
+// in the options of the app: bugs only, not answers
+inkan({ onError: (error) => report(error) });
+```
+</Side>
+
+Every error answer is an [RFC 9457 problem](/docs/api/problems): a `type` a client can
+switch on, a `title`, the `status` and a `detail`. `throw problem(…)` works anywhere, in a
+handler, a hook or a middleware. An unknown route is a 404 `not-found`, a wrong method a 405,
+bad input a 400 `validation`, and anything else thrown a 500 `internal`, with the detail only
+in development. `onProblem` sees every problem before it is written and may change it or
+return another; `onError` sees the errors that are bugs, which is where your error reporting
+goes.
+
+## Tests
+
+<Side>
+```ts title="Express + supertest" notwoslash
+import request from "supertest";
+
+test("finds a tea", async () => {
+  const res = await request(app).get("/teas/1");
+  assert.equal(res.status, 200);
+  assert.equal(res.body.name, "Sencha");
+});
+```
+
+```ts title="inkan"
+import { test } from "node:test";
+import assert from "node:assert/strict";
+
+test("finds a tea", async () => {
+  const res = await app.inject<{ name: string }>({ url: "/teas/1" });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.name, "Sencha");
+});
+```
+</Side>
+
+`app.inject()` sends a request straight into the app, without a port. Most of these tests can
+go into the contract instead, as examples, where they also show up in the docs:
+
+```ts
+app.get("/teas/:id", {
+  params: t.object({ id: t.int() }),
+  response: { 200: Tea, 404: t.problem() },
+  examples: [
+    { name: "found", params: { id: 1 }, expect: { name: "Sencha" } },
+    { name: "missing", params: { id: 99 }, status: 404 },
+  ],
+}, handler);
+```
+
+`npx inkan check src/app.ts` runs every example, and `--strict` fails a status the contract
+promises but no example shows. See [Examples are tests](/docs/examples).
+
+## What is left
+
+- `app.listen()` takes `$PORT`, lets open requests finish on SIGTERM, and can start a process
+  per core with `workers: "auto"`. See [Running it](/docs/deploy).
+- `req.ip` behind a proxy is `ctx.ip` with the `trustProxy` option, as in Express.
+- Template engines: `ctx.html()` and the `html` tag, or `ctx.render()` with a
+  [layout](/docs/api/app#layout).
+- Once it runs, commit `npx inkan openapi src/app.ts -o openapi.json` and let CI run
+  `inkan diff openapi.json src/app.ts`: it fails when a change would break a client.

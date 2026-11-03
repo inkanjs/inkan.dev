@@ -1,0 +1,97 @@
+---
+title: "inkan, Express, Fastify, Hono"
+description: "What each of the four is best at, when I would pick which, and how fast they are on the same bench."
+---
+
+I write inkan, so take this page with that in mind. I have tried to put down where each of
+the other three is the better choice, because for a lot of projects one of them is. If
+something here is wrong or out of date, [open an issue](https://github.com/inkanjs/inkan/issues)
+and I will fix the page.
+
+## Express
+
+Express is the one everybody knows. Almost every Node tutorial uses it, most people you hire
+have shipped it, and for nearly any problem there is a middleware that someone has kept
+alive for years. The API is small: a request, a response, `next()`. Express 5 finally hands
+a rejected promise from an async handler to the error middleware, so the oldest trap is gone.
+
+What it leaves to you is everything about the shape of the data. Validation, the types of
+`req.body`, an OpenAPI document and the docs are separate tools (zod or express-validator,
+swagger-jsdoc or a hand-written spec), and nothing makes them agree with the handler. It is
+also the slowest of the four by a wide margin on the bench below, mostly in routing: with 400
+routes or a 404 it does about a fifth of what bare `node:http` does.
+
+**Pick Express when** the team knows it well, you depend on middleware that only exists for
+Express (a Passport strategy, an SDK that ships an Express adapter), and request throughput
+is not what limits you.
+
+## Fastify
+
+Fastify is the mature fast one. It has run in production for years, in a lot of places, its
+plugin system with encapsulation is well thought out, and
+the `@fastify/*` packages cover most of what an API needs. Routes carry JSON Schema, which it
+compiles with Ajv for the input and with fast-json-stringify for the output, so answers are
+trimmed to their schema. Pino logging is built in, and a type provider (TypeBox or Zod) gives
+the handler its types.
+
+The costs are in the wiring. OpenAPI and a docs page come from `@fastify/swagger` and
+`@fastify/swagger-ui`; tests are yours to write. The validators are compiled at runtime with
+`new Function`, which only matters if you run somewhere that forbids it (a strict CSP, some
+sandboxes). On the bench it is level with inkan: ahead on params and query, behind on large
+answers and on 400s.
+
+**Pick Fastify when** you want a proven framework with a large plugin catalogue and JSON
+Schema as your contract language, and you are fine assembling docs and contract tests from
+separate parts.
+
+## Hono
+
+Hono is built on web standards: a `Request` in, a `Response` out. That is why it runs nearly
+everywhere unchanged: Cloudflare Workers, Deno, Bun, Vercel and Netlify edge functions, AWS
+Lambda, and Node through `@hono/node-server`. It is small, starts fast, and its RPC client
+(`hc`) types calls from the server's routes. Validation is a middleware (`@hono/zod-validator`
+and friends), and `@hono/zod-openapi` writes an OpenAPI document from Zod schemas.
+
+The bench below only measures Node, where Hono runs through an adapter. On Bun or Workers it
+is at home, and these numbers say nothing about that.
+
+**Pick Hono when** your API runs at the edge or on Workers, or cold start and bundle size
+matter more to you than anything on this page.
+
+## inkan
+
+inkan starts from one contract per route: params, query, headers, body, the answers per
+status, and a few examples. From that it validates the input, types the handler, checks the
+answer in development and trims it to the schema, writes OpenAPI 3.1, serves a docs page, and
+runs every example as a test with `inkan check`. `inkan diff` compares the contract with the
+one you shipped last and names what would break a client. It has no runtime dependencies and
+no `eval`, and runs on `node:http`, with `app.fetch` for Bun, Deno and serverless.
+
+What speaks against it: it is young. 0.8 is the first release with a frozen API, it has one
+maintainer, and the plugin catalogue on [Hanko](/hanko) is small next to Express or Fastify.
+If you need an integration nobody has written, you will be the one writing it. It is also
+Node first: `app.fetch` works on other runtimes, but I test and measure on Node.
+
+**Pick inkan when** other people or teams call your API and you want its docs and its
+contract held to the code in CI, you are starting on Node, and a young project with a small
+ecosystem is a risk you can take.
+
+## The numbers
+
+The same bench for all of them: every server does the same work (inkan and Fastify check with
+schemas, Express and Hono by hand), every answer is checked before it is measured, and all
+servers run at once and take turns per scenario.
+
+<BenchTable names={["node:http, by hand", "inkan, sealed", "inkan", "Fastify", "Hono", "Express"]} />
+
+Read it as a range. On another day each server moves by a few points, and inkan and Fastify
+swap places in single scenarios from run to run. What the bench does show reliably is that a
+schema check does not have to cost much: the two frameworks that validate everything are the
+two fastest. It measures one small route at a time on one machine; your database will
+usually matter more than any of these differences.
+
+## Moving over
+
+If you have an app on one of the others, [from Express](/docs/migrate/express) and
+[from Fastify](/docs/migrate/fastify) go through it part by part, with both versions next to
+each other, and show how to move one route at a time instead of all at once.

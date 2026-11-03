@@ -1,0 +1,318 @@
+---
+title: "From Fastify"
+description: "Routes, schemas, hooks, decorators, plugins, error handling and tests from Fastify to inkan, side by side."
+---
+
+Fastify and inkan think about a server in much the same way: a schema on every route, a
+lifecycle of hooks, decorators, and plugins that are encapsulated unless they say otherwise.
+Most of a move is renaming. The parts that are new are what inkan makes from the schema:
+handler types without a type provider, OpenAPI and a docs page without a plugin, and examples
+that run as tests.
+
+## One route at a time
+
+The inkan app can answer a prefix of the Fastify server while the rest stays where it is.
+Hand the request over in an `onRequest` hook, which runs before Fastify reads the body:
+
+```ts title="server.ts" notwoslash
+import Fastify from "fastify";
+import { app } from "./app.ts"; // the inkan app
+
+await app.ready();
+
+const legacy = Fastify();
+legacy.addHook("onRequest", (request, reply, done) => {
+  if (!request.url.startsWith("/v2/")) return done();
+  reply.hijack();                                 // Fastify leaves this answer alone
+  request.raw.url = request.raw.url.slice("/v2".length);
+  app.listener(request.raw, reply.raw);
+});
+await legacy.register(oldRoutes);
+await legacy.listen({ port: 3000 });
+```
+
+The inkan routes are written without the prefix (`/teas/:id` answers `/v2/teas/:id`). When
+nothing is left on the Fastify side, call `app.listen()` instead.
+
+## Routes and schemas
+
+<Side>
+```ts title="Fastify + TypeBox" notwoslash
+const Tea = Type.Object({
+  id: Type.Integer(),
+  name: Type.String({ minLength: 1 }),
+});
+
+fastify.withTypeProvider<TypeBoxTypeProvider>().get("/teas/:id", {
+  schema: {
+    params: Type.Object({ id: Type.Integer() }),
+    response: { 200: Tea, 404: ErrorSchema },
+  },
+}, async (request, reply) => {
+  const tea = teas.get(request.params.id);
+  if (!tea) return reply.code(404).send({ message: "not found" });
+  return tea;
+});
+```
+
+```ts title="inkan"
+const Tea = t.object({
+  id: t.int(),
+  name: t.string().min(1),
+});
+
+app.get("/teas/:id", {
+  params: t.object({ id: t.int() }),
+  response: { 200: Tea, 404: t.problem() },
+}, ({ params, notFound }) => {
+  const tea = teas.get(params.id);
+  if (!tea) return notFound();
+  return tea;
+});
+```
+</Side>
+
+`schema.querystring` is `query`, `schema.body` is `body`, `schema.headers` is `headers`, and
+`schema.response` is `response`, keyed by status as in Fastify. `t` writes JSON Schema for
+the OpenAPI document; you do not write JSON Schema by hand, and the handler gets its types
+from the schema with no type provider. As in Fastify, an answer is trimmed to its response
+schema; in development inkan also checks it and answers a 500 that says where it broke,
+instead of quietly dropping a wrong field. Checks are made from the schema once, without
+`new Function`; `inkan seal` can [compile them ahead of time](/docs/seal) into a file you
+commit.
+
+`reply.code(201).send(x)` is `reply(201, x)`, and `reply.header()` is `ctx.header()`. The
+request and the reply are one [context](/docs/api/context): `params`, `query`, `body`,
+`headers`, `cookies`, and the helpers to answer.
+
+## Hooks
+
+The names are mostly the same, and so is the order.
+
+| Fastify | inkan |
+| --- | --- |
+| `onRequest` | `onRequest`: a route was found, the body is not read yet |
+| `preParsing` | no hook; `bodyLimit` per route, or `body: t.stream()` to read it yourself |
+| `preValidation` | no hook between reading and checking; use `onRequest` or `preHandler` |
+| `preHandler` | `preHandler`: the input is checked and typed |
+| `preSerialization`, `onSend` | `onSend`: every answer, problems too, may change it |
+| `onResponse` | `onResponse`: after it is written |
+| `onError` | `onProblem` for every problem, the `onError` option for bugs |
+| `onTimeout` | the `timeout` option: past it the answer is a 504 problem |
+| `onReady`, `onListen` | `onListen`, awaited before `listen()` resolves |
+| `onClose` | `onClose`, after the last request on shutdown |
+
+<Side>
+```ts title="Fastify" notwoslash
+fastify.addHook("onRequest", async (request, reply) => {
+  if (!request.headers.authorization) {
+    return reply.code(401).send({ message: "unauthorized" });
+  }
+});
+
+fastify.addHook("onSend", async (request, reply, payload) => {
+  reply.header("x-frame-options", "DENY");
+  return payload;
+});
+```
+
+```ts title="inkan"
+app
+  .onRequest((ctx) => {
+    if (!ctx.headers.authorization) throw problem(401, "unauthorized");
+  })
+  .onSend((ctx, answer) => {
+    answer.headers["x-frame-options"] = "DENY";
+  });
+```
+</Side>
+
+A hook may return a value, and that becomes the answer, as with `reply.send()` in Fastify.
+Every hook takes `{ order: "last" }` to run after the others of its kind. For checking
+credentials, `security: "bearer"` on a route (or `app.security("bearer")` for all of them)
+answers the 401 by itself and puts the lock into OpenAPI; what is left for your hook is
+whether the token is good.
+
+## Decorators
+
+<Side>
+```ts title="Fastify" notwoslash
+fastify.decorate("db", pool);
+
+fastify.decorateRequest("user", null);
+fastify.addHook("preHandler", async (request) => {
+  request.user = await users.fromToken(request.headers.authorization);
+});
+
+declare module "fastify" {
+  interface FastifyInstance { db: Pool }
+  interface FastifyRequest { user: User | null }
+}
+```
+
+```ts title="inkan"
+app.decorate("db", pool);
+
+app.decorateRequest(
+  "user",
+  (ctx) => users.fromToken(ctx.headers.authorization),
+  { resolve: "preHandler" }, // awaited before the handler
+);
+
+// no declaration merging: ctx.db and ctx.user are typed from the calls
+```
+</Side>
+
+`decorateRequest` takes the function that makes the value instead of an empty slot and a hook.
+It runs the first time a request reads it, at most once per request, and with
+`{ resolve: "preHandler" }` an async one is awaited before the handler. There is no
+`decorateReply`: what a reply can do is on the context. See
+[async decorations](/docs/plugins#async-decorations).
+
+## Plugins
+
+<Side>
+```ts title="Fastify" notwoslash
+import fp from "fastify-plugin";
+
+// encapsulated: its hooks reach only its own routes
+async function admin(fastify, opts) {
+  fastify.addHook("onRequest", requireAdmin);
+  fastify.get("/stats", async () => stats());
+}
+
+// fastify-plugin: acts on the scope it is registered in
+const poweredBy = fp(async (fastify) => {
+  fastify.addHook("onSend", async (req, reply) => {
+    reply.header("x-powered-by", "tea");
+  });
+}, { name: "powered-by" });
+
+fastify.register(admin, { prefix: "/admin", token });
+fastify.register(poweredBy);
+```
+
+```ts title="inkan"
+import { plugin } from "@vxnsin/inkan";
+
+// scoped: its hooks reach only its own routes
+const admin = plugin((scope, opts: { token: string }) => {
+  scope.onRequest(requireAdmin);
+  scope.get("/stats", () => stats());
+});
+
+// shared: acts on the scope it is registered in
+const poweredBy = plugin((scope) => {
+  scope.onSend((ctx, answer) => {
+    answer.headers["x-powered-by"] = "tea";
+  });
+}, { shared: true, name: "powered-by" });
+
+app.register(admin, { token }, { prefix: "/admin" });
+app.register(poweredBy);
+```
+</Side>
+
+The model is the one you know: a plugin gets a scope of its own, and `{ shared: true }` is
+`fastify-plugin`. The difference is the arguments of `register`: options and the prefix are
+two arguments, `register(plugin, options, { prefix })`, so a plugin's options never clash
+with `prefix`. Plugins load in order, an async one holds back the ones after it, and
+`listen()` (or `await app.ready()`) waits for all of them. [Writing a plugin](/docs/plugins)
+has typed decorations from shared plugins, route meta, `onOperation` for OpenAPI, and how to
+declare the inkan versions a plugin works with.
+
+Fastify plugins do not run in inkan. For the common ones: `@fastify/cors` is
+[`cors()`](/docs/built-in/cors), `@fastify/rate-limit` [`rateLimit()`](/docs/built-in/rate-limit),
+`@fastify/compress` [`compress()`](/docs/built-in/compress), `@fastify/static`
+[`serveStatic()`](/docs/built-in/static), `@fastify/helmet`
+[`@inkanjs/secure-headers`](/docs/official/secure-headers), `@fastify/session`
+[`@inkanjs/session`](/docs/official/session), `@fastify/jwt` and `@fastify/auth`
+[`@inkanjs/auth`](/docs/official/auth), `@fastify/websocket` [`app.ws()`](/docs/websocket),
+`@fastify/under-pressure` the [`pressure` option](/docs/runtime), and `@fastify/swagger` with
+`@fastify/swagger-ui` are built in, at `/openapi.json` and `/docs`.
+
+## Errors
+
+<Side>
+```ts title="Fastify" notwoslash
+fastify.setNotFoundHandler((request, reply) => {
+  reply.code(404).send({ message: "Nothing here" });
+});
+
+fastify.setErrorHandler((error, request, reply) => {
+  if (error.validation) return reply.code(400).send({ issues: error.validation });
+  request.log.error(error);
+  reply.code(500).send({ message: "internal" });
+});
+
+throw fastify.httpErrors.conflict("taken"); // @fastify/sensible
+```
+
+```ts title="inkan"
+app.onProblem((ctx, p) => {
+  if (p.type === "not-found") p.detail = "Nothing here";
+});
+
+// in the options of the app: bugs only, not answers
+inkan({ onError: (error, ctx) => log.error(error) });
+
+// validation errors are a 400 `validation` problem by themselves
+
+throw problem(409, "taken", "That name is taken");
+```
+</Side>
+
+Every error is an [RFC 9457 problem](/docs/api/problems) with a stable `type`: bad input is
+a 400 `validation` with an `errors` list, an unknown route a 404 `not-found`, a thrown error a
+500 `internal` whose detail only shows in development. `onProblem` replaces both the not-found
+and the error handler: it sees every problem before it is written and may change it or
+return another.
+
+## Logging
+
+Fastify logs through Pino. inkan writes one line per request by itself, `"pretty"` in
+development and `"json"` in production. To hand the lines to Pino, or anything else, use the
+`logger` option:
+
+```ts notwoslash
+const app = inkan({ logger: (entry) => pino.info(entry) });
+```
+
+## Tests
+
+<Side>
+```ts title="Fastify" notwoslash
+test("finds a tea", async () => {
+  const res = await fastify.inject({ method: "GET", url: "/teas/1" });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.json().name, "Sencha");
+});
+```
+
+```ts title="inkan"
+test("finds a tea", async () => {
+  const res = await app.inject<{ name: string }>({ method: "GET", url: "/teas/1" });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.name, "Sencha");
+});
+```
+</Side>
+
+`inject` is there as in Fastify, with `status` and the parsed `body` in place of `statusCode`
+and `json()`. What you will want to use more: examples in the contract, which the docs page
+shows and `npx inkan check src/app.ts` runs, every one, in CI:
+
+```ts
+app.get("/teas/:id", {
+  params: t.object({ id: t.int() }),
+  response: { 200: Tea, 404: t.problem() },
+  examples: [
+    { name: "found", params: { id: 1 }, expect: { name: "Sencha" } },
+    { name: "missing", params: { id: 99 }, status: 404 },
+  ],
+}, handler);
+```
+
+[Examples are tests](/docs/examples) has examples that build on each other, cookies across a
+chain, and `--strict`. Once the app runs, commit its OpenAPI document and let CI run
+`npx inkan diff openapi.json src/app.ts`: it exits with 1 when a change would break a client.
