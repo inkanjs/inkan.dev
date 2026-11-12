@@ -48,13 +48,13 @@ it. A cookie session lasts until it expires even after `destroy()`, if someone k
 When logout must end a session for certain, use a store.
 
 ```ts notwoslash
-import { memoryStore } from "@vxnsin/inkan";
+import { memoryStore } from "@inkanjs/inkan";
 import { session } from "@inkanjs/session";
 
 app.register(session({ secret, store: memoryStore({ max: 50_000 }) }));
 ```
 
-The store is an inkan [`Store`](/docs/storage). `memoryStore` from `@vxnsin/inkan` lives in
+The store is an inkan [`Store`](/docs/storage). `memoryStore` from `@inkanjs/inkan` lives in
 the process: right for development and one process. For more, any `Store` works, such as
 [Redis](/docs/official/redis), [PostgreSQL](/docs/official/postgres),
 [MongoDB](/docs/official/mongo) or [MySQL](/docs/official/mysql):

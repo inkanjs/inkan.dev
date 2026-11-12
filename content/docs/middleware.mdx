@@ -53,7 +53,7 @@ without them breaks the contract like a wrong body does.
 origin, add `cors()`:
 
 ```ts
-import { cors } from "@vxnsin/inkan";
+import { cors } from "@inkanjs/inkan";
 
 app.register(cors());                                                        // any origin
 app.register(cors({ origins: ["https://shop.example"], credentials: true }));  // one origin, with cookies
@@ -79,7 +79,7 @@ routes/files/[...rest].ts  /files/*rest
 
 ```ts
 // routes/teas/[id].ts
-import { route, t } from "@vxnsin/inkan";
+import { route, t } from "@inkanjs/inkan";
 
 export const GET = route({ params: t.object({ id: t.int() }), response: { 200: Tea } }, ({ params }) => find(params.id));
 export const DELETE = route({ params: t.object({ id: t.int() }) }, ({ params }) => remove(params.id));

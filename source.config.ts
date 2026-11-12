@@ -8,7 +8,7 @@ import { createTwoslasher } from "twoslash";
 // What every snippet takes for granted: the inkan API, and an app to add routes to. It sits
 // in front of each block and is cut away before the block is shown, so the names in it carry
 // their real types without the page showing an import above every example.
-const PRELUDE = `import { inkan, t, html, raw, problem, reply, sse, routes, route, plugin, cors, rateLimit, compress, serveStatic } from "@vxnsin/inkan";
+const PRELUDE = `import { inkan, t, html, raw, problem, reply, sse, routes, route, plugin, cors, rateLimit, compress, serveStatic } from "@inkanjs/inkan";
 const app = inkan();
 // ---cut---
 `;

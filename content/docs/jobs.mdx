@@ -208,7 +208,7 @@ first of the month and every Monday. `@yearly`, `@monthly`, `@weekly`, `@daily`,
 ## Where jobs are kept
 
 ```ts notwoslash
-import { memoryStore } from "@vxnsin/inkan";
+import { memoryStore } from "@inkanjs/inkan";
 import { redisStore } from "@inkanjs/redis";
 
 app.job("/exports", { store: memoryStore({ max: 5000 }) }, run); // this process

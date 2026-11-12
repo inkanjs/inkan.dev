@@ -186,7 +186,7 @@ for the whole. A client that sends `accept: application/x-ndjson` gets one JSON 
 ## Groups
 
 ```ts
-import { routes } from "@vxnsin/inkan";
+import { routes } from "@inkanjs/inkan";
 
 const admin = routes().security("bearer").use(audit).get("/stats", stats);
 app.mount("/admin", admin);
@@ -200,7 +200,7 @@ under a prefix, types and all. For hooks and decorations of their own, use a
 
 ```ts
 // routes/teas/[id].ts
-import { route, t } from "@vxnsin/inkan";
+import { route, t } from "@inkanjs/inkan";
 
 export const GET = route({ params: t.object({ id: t.int() }) }, ({ params }) => findTea(params.id));
 ```

@@ -26,7 +26,7 @@ The common case: a service you call that sometimes falls over. Wrap the call onc
 the wrapped function as before.
 
 ```ts
-import { HttpProblem } from "@vxnsin/inkan";
+import { HttpProblem } from "@inkanjs/inkan";
 import { circuit, CircuitOpenError } from "@inkanjs/circuit-breaker";
 
 const rates = circuit((currency: string) => fetch(`https://rates.example/${currency}`, { signal: AbortSignal.timeout(2000) }), {

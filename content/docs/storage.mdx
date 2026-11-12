@@ -11,7 +11,7 @@ part the same shared store, from Redis or the database you already run, and they
 same state.
 
 ```ts notwoslash
-import { inkan, rateLimit } from "@vxnsin/inkan";
+import { inkan, rateLimit } from "@inkanjs/inkan";
 import { redisStore } from "@inkanjs/redis";
 import { session } from "@inkanjs/session";
 
@@ -29,7 +29,7 @@ Each part keeps its keys apart by a prefix of its own, so one store serves them 
 ## The Store interface
 
 ```ts notwoslash
-import type { Store } from "@vxnsin/inkan";
+import type { Store } from "@inkanjs/inkan";
 
 interface Store {
   get<T = unknown>(key: string): Promise<T | undefined>;
@@ -82,7 +82,7 @@ counter that counts every parallel guess, an idempotency key that only one proce
 ## memoryStore
 
 ```ts
-import { memoryStore } from "@vxnsin/inkan";
+import { memoryStore } from "@inkanjs/inkan";
 
 const store = memoryStore({ max: 50_000 });
 ```
@@ -153,12 +153,12 @@ apps on one Redis or one table keep apart by the adapter's `prefix`.
 ## Writing an adapter
 
 A store of your own (another database, a cloud key-value service) implements the interface
-above and proves it with the conformance suite from `@vxnsin/inkan/testing`:
+above and proves it with the conformance suite from `@inkanjs/inkan/testing`:
 
 ```ts notwoslash
 // store.test.ts
 import { randomUUID } from "node:crypto";
-import { storeConformance } from "@vxnsin/inkan/testing";
+import { storeConformance } from "@inkanjs/inkan/testing";
 import { myStore } from "./index.ts";
 
 storeConformance(() => myStore(client, { prefix: `test:${randomUUID()}:` }), {
@@ -189,12 +189,12 @@ emptied between runs passes too. The TTL test waits about four seconds of real t
 `wait` moves the store's clock:
 
 ```ts notwoslash
-import { memoryStore } from "@vxnsin/inkan";
-import { storeConformance } from "@vxnsin/inkan/testing";
+import { memoryStore } from "@inkanjs/inkan";
+import { storeConformance } from "@inkanjs/inkan/testing";
 
 let now = Date.now();
 storeConformance(() => memoryStore({ clock: () => now }), { wait: async (ms) => void (now += ms) });
 ```
 
 When you publish it, say which inkan it was tested with (`peerDependencies`
-`"@vxnsin/inkan": ">=0.8.0 <1.0.0"`), and [list it on Hanko](/docs/publish-a-plugin).
+`"@inkanjs/inkan": ">=0.8.0 <1.0.0"`), and [list it on Hanko](/docs/publish-a-plugin).

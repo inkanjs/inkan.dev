@@ -8,7 +8,7 @@ Three things an app needs once it runs for real, each off until you ask for it.
 ## env()
 
 ```ts
-import { env, t } from "@vxnsin/inkan";
+import { env, t } from "@inkanjs/inkan";
 
 export const config = env(t.object({
   PORT: t.int().default(3000),
@@ -70,7 +70,7 @@ Without the option it is `undefined`, there is no timer, and a request reads not
 ## currentContext(): the request, anywhere
 
 ```ts
-import { currentContext, inkan } from "@vxnsin/inkan";
+import { currentContext, inkan } from "@inkanjs/inkan";
 
 const app = inkan({ context: true });
 

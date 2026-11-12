@@ -4,7 +4,7 @@ description: "How inkan answers when something is wrong: RFC 9457 problem docume
 ---
 
 ```ts
-import { problem } from "@vxnsin/inkan";
+import { problem } from "@inkanjs/inkan";
 
 app.post("/teas", { body: NewTea }, ({ body }) => {
   if (store.has(body.name)) throw problem(409, "taken", `There is a tea called ${body.name}`, { name: body.name });

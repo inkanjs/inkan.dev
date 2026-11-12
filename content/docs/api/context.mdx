@@ -111,7 +111,7 @@ Free space for middleware to hand things on to the handler. For values that are 
 every request, a [decoration](/docs/api/app#decorate) is cheaper.
 
 ```ts
-import { stateKey } from "@vxnsin/inkan";
+import { stateKey } from "@inkanjs/inkan";
 
 export const tenant = stateKey<Tenant>("tenant");
 
@@ -194,7 +194,7 @@ Plain text. The status is the one `status()` set, or the usual one, unless given
 ## html()
 
 ```ts
-import { html } from "@vxnsin/inkan";
+import { html } from "@inkanjs/inkan";
 
 app.get("/tea/:name", ({ params, html: page }) => page(html`<h1>${params.name}</h1>`));
 app.get("/hi/:name", ({ params }) => html`<p>Hello, ${params.name}</p>`); // the same, returned as it is

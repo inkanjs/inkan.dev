@@ -9,7 +9,7 @@ or any async iterable. It goes out piece by piece, as it comes.
 **Server-sent events** have a contract like any other answer, one schema per event:
 
 ```ts
-import { sse, t } from "@vxnsin/inkan";
+import { sse, t } from "@inkanjs/inkan";
 
 app.get(
   "/clock",
@@ -36,7 +36,7 @@ as many events as an example expects, so a stream that never ends can still be a
 `multipart/form-data`, and OpenAPI says so:
 
 ```ts
-import { fileExample, t } from "@vxnsin/inkan";
+import { fileExample, t } from "@inkanjs/inkan";
 
 app.post(
   "/avatars",

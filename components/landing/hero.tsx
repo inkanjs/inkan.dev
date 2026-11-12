@@ -174,7 +174,7 @@ export function Hero() {
           </Link>
           <p className="basis-full font-mono text-xs text-muted">
             a project with a store, auth and tests · into one you have:{" "}
-            <span className="text-soft">npm i @vxnsin/inkan</span>
+            <span className="text-soft">npm i @inkanjs/inkan</span>
           </p>
         </motion.div>
       </div>

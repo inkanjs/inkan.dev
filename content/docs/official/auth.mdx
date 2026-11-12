@@ -405,7 +405,7 @@ scheme: list your public origin in `origins`.
 
 Sessions, refresh tokens, pending TOTP secrets and used TOTP steps live in `store`; the
 brute-force counters in `bruteForce.store`, a second one. Both are inkan
-[`Store`](/docs/storage)s, by default `memoryStore()` from `@vxnsin/inkan`: in memory, per
+[`Store`](/docs/storage)s, by default `memoryStore()` from `@inkanjs/inkan`: in memory, per
 process (100 000 keys for `store`, 50 000 for the counters). For several processes, give
 shared ones, from an adapter or written against the interface:
 
