@@ -1,6 +1,6 @@
 ---
 title: "CLI"
-description: "inkan check, diff, openapi, create, examples and seal."
+description: "inkan check, diff, openapi, create, examples, hanko and seal."
 ---
 
 ```sh
@@ -12,6 +12,7 @@ npx inkan seal    src/app.ts [-o src/inkan.seal.js]
 npx inkan create app [folder] [--store <s>] [--auth] [--frontend <f>] [--yes]
 npx inkan create plugin <name> [folder]
 npx inkan examples [name] [folder] [--list] [--force]
+npx inkan hanko    [query] [--kind <k>] [--json]
 ```
 
 The entry is the file that builds the app and exports it, as `export default app` or
@@ -27,6 +28,12 @@ something breaks, so CI can ask for a major version.
 `inkan create app` is what `npm create inkan` runs; its options are on
 [Installation](/docs/installation#start-a-project). `inkan create plugin` writes a package for
 a plugin of your own, see [Publish a plugin](/docs/publish-a-plugin).
+
+`inkan hanko` is [Hanko](/hanko) in the terminal: pick a kind, search as you type, and a
+plugin shows how it gets in (the import for a built-in, the install line for a package) and
+installs into the project you are in. Without a terminal it prints the matches grouped by
+kind, and `--json` gives them as data. It reads [/hanko.json](/hanko.json), the same list as
+the page.
 
 ## Formats
 

@@ -1,0 +1,112 @@
+---
+title: "A new name, arrow keys, and Hanko in your terminal"
+description: "inkan is @inkanjs/inkan now, npm create inkan asks with arrow keys, and inkan hanko finds plugins, middleware and stores without leaving the terminal."
+date: "2026-11-12"
+author: "Vensin"
+---
+
+Three small releases in one day, 0.9.2 to 0.9.4, and none of them touches the request path.
+They are about the edges: what the package is called, how it asks you things, and how you
+find what to plug into it.
+
+## @inkanjs/inkan
+
+The core was published as `@vxnsin/inkan`, under my own name, while everything around it
+already lived in the inkanjs organisation: the repository, the middleware, the integrations,
+this site. That made the one package everybody installs the odd one out. From 0.9.2 it is
+**`@inkanjs/inkan`**, next to `@inkanjs/auth`, `@inkanjs/redis` and the rest.
+
+npm cannot move a package from one scope to another, so this is a new package with the same
+code, not a rename. `@vxnsin/inkan` stays at 0.9.1 and is marked deprecated, so an install
+still works and tells you where to go. Nothing else changed: the API, the CLI and the `inkan`
+binary are the same.
+
+Every official plugin got a patch release that depends on the new name, from
+`@inkanjs/auth` 0.2.2 to `@inkanjs/uws` 0.5.1. Their ranges still say `>=0.8.0 <1.0.0`, so a
+plugin you wrote against 0.8 keeps working once you point it at `@inkanjs/inkan`.
+
+The core and `create-inkan` are now published by the release workflow through npm's trusted
+publishing, with provenance, instead of from my machine.
+
+## npm create inkan, with arrow keys
+
+0.9.3 replaces the numbered questions of `npm create inkan` with prompts you drive with the
+keyboard:
+
+```text
+  印 create inkan  v0.9.4 · a new app
+
+  ✔ folder · my-api
+  ◆ where does the data live?  ↑↓ enter
+  │ ❯ memory     in this process, nothing to install (swap it later)
+  │   postgres   @inkanjs/postgres on pg
+  │   redis      @inkanjs/redis on node-redis
+  │   mongo      @inkanjs/mongo on the mongodb driver
+  │   mysql      @inkanjs/mysql on mysql2
+  └
+```
+
+Arrows or `j`/`k` move, a digit jumps, enter picks, and each answer shrinks to one line once
+it is given. Yes or no is a toggle on the arrow keys, or just `y` and `n`. A folder that is
+not empty is caught while you type, not after the last question. Esc or Ctrl-C stops with
+nothing written.
+
+It still has no dependencies: the prompts are about two hundred lines on `node:readline`.
+And it still asks nothing without a terminal or with `--yes`, so scripts and CI see no
+difference. `NO_COLOR` keeps the prompts and drops the colour.
+
+## inkan hanko
+
+[Hanko](/hanko) is the list of everything that stamps onto an inkan app: the built-ins, the
+official middleware and stores, the integrations, the recipes, and the community packages
+with the `inkan-plugin` keyword. 0.9.4 brings it into the terminal:
+
+```sh
+npx inkan hanko
+```
+
+You pick a kind (or everything), then search as you type. The name counts most, then the
+tags, then the description, and every word has to match somewhere, so `redis sessions` finds
+the store and not every package that mentions sessions. Enter shows a card:
+
+```text
+  @inkanjs/session  middleware  ·  needs inkan 0.7.0
+  Cookie sessions: signed, encrypted, or a random id in front of a store. Typed on ctx.session.
+  #session #cookies #store
+
+  │ npm install @inkanjs/session
+  │ https://inkan-dev.vercel.app/docs/official/session
+  │ https://github.com/inkanjs/middleware
+```
+
+A built-in shows its import line instead, since there is nothing to install. Inside a
+project, "install" runs the install with the package manager you ran the CLI with.
+
+With a query it skips the first question, and without a terminal it prints the matches
+grouped by kind, which is handy in a script:
+
+```sh
+npx inkan hanko store
+npx inkan hanko --kind middleware --json
+```
+
+The data comes from [/hanko.json](/hanko.json), the same list this site renders, so a plugin
+added to Hanko shows up in the terminal without a new release of inkan. If the site does not
+answer, the CLI falls back to npm's search and says so.
+
+## Upgrading
+
+```sh
+npm uninstall @vxnsin/inkan
+npm install @inkanjs/inkan@0.9
+```
+
+Then change the imports, `from "@vxnsin/inkan"` to `from "@inkanjs/inkan"`, and the same for
+`/client` and `/testing`. A search and replace over your sources is all it takes. If you use
+the official plugins, update them in the same go, so they look for the core under its new
+name.
+
+The [CHANGELOG](https://github.com/inkanjs/inkan/blob/main/CHANGELOG.md) has the details of
+each release. And if something on Hanko is missing from the terminal, or the other way
+round, that is a bug I would like to hear about in the
+[issues](https://github.com/inkanjs/inkan/issues).
