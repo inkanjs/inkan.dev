@@ -18,7 +18,7 @@ and CI read from the [command line](#the-command-line).
   rule.
 - **Experimental** exports are marked `@experimental` and may change in any minor. The
   CHANGELOG names every such change.
-- **Not API**: anything not exported from `@vxnsin/inkan` or `@vxnsin/inkan/client`,
+- **Not API**: anything not exported from `@inkanjs/inkan` or `@inkanjs/inkan/client`,
   anything named `_x`, and anything marked `@internal`.
 - **Security fixes** may break behaviour at once. They are announced in the CHANGELOG.
 - **Plugins** declare `inkan: ">=0.8.0 <1.0.0"`: from the minor they were built on up to the
@@ -47,7 +47,7 @@ every change to the API shows up in review.
 | built-in middleware | `cors`, `rateLimit`, `serveStatic`, `compress` and their option types; `Origins`, `PreContext` |
 | servers and tests | `inject`, `InjectOptions`, `InjectResponse`, `listener`, `fetch`, `exchange`, `AdapterRequest`, `AdapterResponse`, `bodyFor`, `logRequest`, `listen`, `ListenOptions`, `RequestLog`, `RegisterOptions`, `joinPath` |
 | the rest | `Layout`, `TrustProxy`, `CacheRule`, `fileExample`, `env`, `Store`, `memoryStore` |
-| `@vxnsin/inkan/client` | `client`, `Client`, `ClientOptions`, `Answer`, `Input`, `Jsonify`, `StreamError` |
+| `@inkanjs/inkan/client` | `client`, `Client`, `ClientOptions`, `Answer`, `Input`, `Jsonify`, `StreamError` |
 
 ## The command line
 
@@ -130,8 +130,8 @@ milliseconds where they were seconds. Their old exports are kept as deprecated r
 
 | old | new |
 | --- | --- |
-| `memoryStore` from `@inkanjs/auth`, `@inkanjs/session` or `@inkanjs/idempotency` | `memoryStore` from `@vxnsin/inkan` |
-| `Store`, `AuthStore` from `@inkanjs/auth`; `SessionStore`; `IdempotencyStore` | `Store` from `@vxnsin/inkan` |
+| `memoryStore` from `@inkanjs/auth`, `@inkanjs/session` or `@inkanjs/idempotency` | `memoryStore` from `@inkanjs/inkan` |
+| `Store`, `AuthStore` from `@inkanjs/auth`; `SessionStore`; `IdempotencyStore` | `Store` from `@inkanjs/inkan` |
 | a store of your own with TTLs in seconds | the same store with TTLs in milliseconds, or an [adapter](/docs/storage#choosing-an-adapter) |
 
 ## Finding the old names

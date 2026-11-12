@@ -32,7 +32,7 @@ const Pet = t.discriminated("kind", {
 type Node = { name: string; children: Node[] };
 const Node: Schema<Node> = t.object({
   name: t.string(), children: t.array(t.lazy(() => Node)),
-}).named("Node"); // import type { Schema } from "@vxnsin/inkan"
+}).named("Node"); // import type { Schema } from "@inkanjs/inkan"
 ```
 
 Refinements and transforms are synchronous, run in chain order after successful

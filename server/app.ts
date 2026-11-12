@@ -1,7 +1,7 @@
 // The API this site runs on: an inkan app, served by Next.js through @inkanjs/next.
 // The playground on the front page talks to it, and its own docs live at /api/docs.
 // Everything sits in memory and resets with the process: it is a playground, not a shop.
-import { inkan, problem, rateLimit, reply, routes, sse, t } from "@vxnsin/inkan";
+import { inkan, problem, rateLimit, reply, routes, sse, t } from "@inkanjs/inkan";
 
 const Tea = t.object({ id: t.int(), name: t.string(), grams: t.int(), brewed: t.date() }).named("Tea");
 const NewTea = t.object({ name: t.string().trim().min(1).max(40), grams: t.int().min(1).max(1000) }).named("NewTea");

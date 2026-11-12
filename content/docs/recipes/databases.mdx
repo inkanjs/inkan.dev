@@ -14,7 +14,7 @@ Chain `decorate` on the app: the handlers after it see `ctx.db` typed as the cli
 ## Postgres (pg)
 
 ```ts notwoslash
-import { inkan, t } from "@vxnsin/inkan";
+import { inkan, t } from "@inkanjs/inkan";
 import pg from "pg";
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
@@ -36,7 +36,7 @@ then `begin`, your queries, `commit` (or `rollback` in a `catch`), and `c.releas
 ## Redis (ioredis)
 
 ```ts notwoslash
-import { inkan, t } from "@vxnsin/inkan";
+import { inkan, t } from "@inkanjs/inkan";
 import { Redis } from "ioredis";
 
 const redis = new Redis(process.env.REDIS_URL!, { lazyConnect: true });
@@ -55,7 +55,7 @@ Commands that must run together go in `redis.multi()…exec()`: queued, then sen
 ## MongoDB
 
 ```ts notwoslash
-import { inkan, t } from "@vxnsin/inkan";
+import { inkan, t } from "@inkanjs/inkan";
 import { MongoClient } from "mongodb";
 
 type Tea = { id: number; name: string };
@@ -77,7 +77,7 @@ passing `{ session: s }` to every call inside.
 ## Prisma
 
 ```ts notwoslash
-import { inkan, t } from "@vxnsin/inkan";
+import { inkan, t } from "@inkanjs/inkan";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "./generated/prisma/client";
 

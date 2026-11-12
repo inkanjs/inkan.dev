@@ -103,7 +103,7 @@ An app that serves its own built frontend registers two plugins: the files, with
 fallback a single-page app needs, and compression for everything that pays.
 
 ```ts
-import { compress, serveStatic } from "@vxnsin/inkan";
+import { compress, serveStatic } from "@inkanjs/inkan";
 
 app
   .register(compress()) // brotli or gzip, as the client takes it; streams too, event streams not

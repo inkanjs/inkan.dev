@@ -17,7 +17,7 @@ the plugin is for other people. The [hooks](/docs/hooks) page has the basics.
 ## Shared or scoped
 
 ```ts
-import { plugin } from "@vxnsin/inkan";
+import { plugin } from "@inkanjs/inkan";
 
 const admin = plugin((app) => {                       // scoped: a scope of its own
   app.onRequest(requireAdmin);
@@ -130,7 +130,7 @@ For a plugin written in JavaScript, or one that does not return its scope, say w
 in the type: `Plugin<Options, Needs, Adds>`.
 
 ```ts
-import type { Plugin } from "@vxnsin/inkan";
+import type { Plugin } from "@inkanjs/inkan";
 
 export declare function session(options: { secret: string }): Plugin<{}, {}, { session: Session }>;
 ```
@@ -181,7 +181,7 @@ A plugin names what it reads by extending the exported `RouteMeta` interface. Th
 shape does not compile, and the editor suggests the field:
 
 ```ts
-declare module "@vxnsin/inkan" {
+declare module "@inkanjs/inkan" {
   interface RouteMeta {
     auth?: { roles: string[] };
   }
@@ -194,7 +194,7 @@ write, which no route spec can set by accident.
 ```ts
 export const INTERNAL = Symbol("my-plugin");
 
-declare module "@vxnsin/inkan" {
+declare module "@inkanjs/inkan" {
   interface RouteMeta {
     [INTERNAL]?: boolean;
   }
@@ -232,7 +232,7 @@ The fourth argument, `ref(schema, name?)`, puts a `t.*` schema into the document
 unnamed schema needs `name`:
 
 ```ts
-import { t } from "@vxnsin/inkan";
+import { t } from "@inkanjs/inkan";
 
 const Locked = t.object({ until: t.string() });
 
@@ -280,7 +280,7 @@ a transaction around the handler, or an AsyncLocalStorage of your own. Experimen
 ## stateKey: a slot of your own in ctx.state
 
 ```ts
-import { stateKey } from "@vxnsin/inkan";
+import { stateKey } from "@inkanjs/inkan";
 
 export const tenant = stateKey<Tenant>("tenant");
 

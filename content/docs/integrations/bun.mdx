@@ -17,13 +17,13 @@ Bun's own websockets carrying the frames.
 ## Install
 
 ```sh
-bun add @vxnsin/inkan @inkanjs/bun
+bun add @inkanjs/inkan @inkanjs/bun
 ```
 
 ## Use
 
 ```ts
-import { inkan, t } from "@vxnsin/inkan";
+import { inkan, t } from "@inkanjs/inkan";
 import { serve } from "@inkanjs/bun";
 
 const app = inkan().get("/teas/:id", { params: t.object({ id: t.int() }) }, ({ params }) => ({ id: params.id }));

@@ -15,7 +15,7 @@ export const api = inkan()
 
 // web.ts: only the type crosses over, none of the server
 import type { api } from "./server.ts";
-import { client } from "@vxnsin/inkan/client";
+import { client } from "@inkanjs/inkan/client";
 
 const shop = client<typeof api>("https://shop.example.com", { headers: () => ({ authorization: `Bearer ${token}` }) });
 

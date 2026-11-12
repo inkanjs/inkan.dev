@@ -4,7 +4,7 @@ description: "inkan(): the app, its options, and everything it can do."
 ---
 
 ```ts
-import { inkan, t } from "@vxnsin/inkan";
+import { inkan, t } from "@inkanjs/inkan";
 
 const app = inkan({ title: "Tea Shop", version: "1.0.0" })
   .get("/hello", () => ({ hello: "world" }));
@@ -99,7 +99,7 @@ request, so a route pays for it only when a scope above it has one. Experimental
 ## register()
 
 ```ts
-import { plugin } from "@vxnsin/inkan";
+import { plugin } from "@inkanjs/inkan";
 
 const admin = plugin((scope, options: { token: string }) => {
   scope.onRequest((ctx) => {
@@ -209,7 +209,7 @@ Read-only. `dev` is whether the app runs in development (the `dev` option, by de
 with `register(p, options, { prefix: "/v1" })`. New in 0.7.0.
 
 ```ts
-import { joinPath } from "@vxnsin/inkan";
+import { joinPath } from "@inkanjs/inkan";
 
 joinPath(scope.prefix, "/login"); // "/auth/login", one slash between the parts
 ```
@@ -239,7 +239,7 @@ docs page list them. Whether the credentials are good is for your hook or handle
 ## mount()
 
 ```ts
-import { routes } from "@vxnsin/inkan";
+import { routes } from "@inkanjs/inkan";
 
 const teas = routes().get("/", list).get("/:id", spec, one);
 app.mount("/teas", teas);

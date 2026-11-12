@@ -15,7 +15,7 @@ export default function Layout({ children }: LayoutProps<"/docs">) {
         url: "/",
       }}
       githubUrl="https://github.com/inkanjs/inkan"
-      links={[{ text: "Hanko", url: "/hanko" }, { text: "npm", url: "https://www.npmjs.com/package/@vxnsin/inkan", external: true }]}
+      links={[{ text: "Hanko", url: "/hanko" }, { text: "npm", url: "https://www.npmjs.com/package/@inkanjs/inkan", external: true }]}
     >
       {children}
     </DocsLayout>

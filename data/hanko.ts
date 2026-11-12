@@ -52,7 +52,7 @@ export const hanko: Hanko[] = [
     kind: "built-in",
     href: "/docs/built-in/cors",
     repo: CORE,
-    code: `import { cors } from "@vxnsin/inkan"`,
+    code: `import { cors } from "@inkanjs/inkan"`,
     tags: ["middleware", "headers", "browser", "preflight"],
   },
   {
@@ -61,7 +61,7 @@ export const hanko: Hanko[] = [
     kind: "built-in",
     href: "/docs/built-in/rate-limit",
     repo: CORE,
-    code: `import { rateLimit } from "@vxnsin/inkan"`,
+    code: `import { rateLimit } from "@inkanjs/inkan"`,
     tags: ["middleware", "security", "throttle", "429"],
   },
   {
@@ -70,7 +70,7 @@ export const hanko: Hanko[] = [
     kind: "built-in",
     href: "/docs/built-in/compress",
     repo: CORE,
-    code: `import { compress } from "@vxnsin/inkan"`,
+    code: `import { compress } from "@inkanjs/inkan"`,
     tags: ["middleware", "brotli", "gzip", "performance"],
   },
   {
@@ -79,7 +79,7 @@ export const hanko: Hanko[] = [
     kind: "built-in",
     href: "/docs/built-in/static",
     repo: CORE,
-    code: `import { serveStatic } from "@vxnsin/inkan"`,
+    code: `import { serveStatic } from "@inkanjs/inkan"`,
     tags: ["middleware", "files", "spa", "frontend"],
   },
   {
@@ -104,7 +104,7 @@ export const hanko: Hanko[] = [
     kind: "built-in",
     href: "/docs/client",
     repo: CORE,
-    code: `import { client } from "@vxnsin/inkan/client"`,
+    code: `import { client } from "@inkanjs/inkan/client"`,
     tags: ["types", "fetch", "frontend", "rpc"],
   },
   {
@@ -129,7 +129,7 @@ export const hanko: Hanko[] = [
     kind: "built-in",
     href: "/docs/streams",
     repo: CORE,
-    code: `import { sse, t } from "@vxnsin/inkan"`,
+    code: `import { sse, t } from "@inkanjs/inkan"`,
     tags: ["sse", "events", "multipart", "forms", "files", "streaming"],
   },
   {
@@ -165,7 +165,7 @@ export const hanko: Hanko[] = [
     kind: "built-in",
     href: "/docs/runtime#env",
     repo: CORE,
-    code: `import { env } from "@vxnsin/inkan"`,
+    code: `import { env } from "@inkanjs/inkan"`,
     since: "0.7.0",
     tags: ["config", "environment", "validation", "12-factor"],
   },
@@ -184,7 +184,7 @@ export const hanko: Hanko[] = [
     kind: "built-in",
     href: "/docs/runtime#currentcontext-the-request-anywhere",
     repo: CORE,
-    code: `import { currentContext } from "@vxnsin/inkan"`,
+    code: `import { currentContext } from "@inkanjs/inkan"`,
     since: "0.7.0",
     tags: ["asynclocalstorage", "logging", "tracing", "request"],
   },
@@ -194,7 +194,7 @@ export const hanko: Hanko[] = [
     kind: "built-in",
     href: "/docs/storage#memorystore",
     repo: CORE,
-    code: `import { memoryStore } from "@vxnsin/inkan"`,
+    code: `import { memoryStore } from "@inkanjs/inkan"`,
     since: "0.8.0",
     tags: ["store", "cache", "ttl", "jobs", "sessions"],
   },
@@ -212,7 +212,7 @@ export const hanko: Hanko[] = [
     kind: "built-in",
     href: "/docs/api/context#html",
     repo: CORE,
-    code: `import { html } from "@vxnsin/inkan"`,
+    code: `import { html } from "@inkanjs/inkan"`,
     tags: ["html", "templates", "layout", "ssr"],
   },
   {
@@ -221,7 +221,7 @@ export const hanko: Hanko[] = [
     kind: "built-in",
     href: "/docs/api/problems",
     repo: CORE,
-    code: `import { problem } from "@vxnsin/inkan"`,
+    code: `import { problem } from "@inkanjs/inkan"`,
     tags: ["errors", "rfc 9457"],
   },
   {

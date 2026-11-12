@@ -22,7 +22,7 @@ A plugin is a function that gets a scope of its own. What it adds there (routes,
 hooks, decorations) stays there, under its prefix, unless it says `shared: true`:
 
 ```ts
-import { plugin, problem, rateLimit } from "@vxnsin/inkan";
+import { plugin, problem, rateLimit } from "@inkanjs/inkan";
 
 const admin = plugin(async (app, opts: { token: string }) => {
   app.register(rateLimit({ max: 10 }));      // only these routes

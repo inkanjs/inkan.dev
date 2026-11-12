@@ -3,7 +3,7 @@
 import { cacheLife } from "next/cache";
 
 const REPOS = ["inkanjs/inkan", "inkanjs/integrations"];
-export const PACKAGES = ["@vxnsin/inkan", "@inkanjs/next", "@inkanjs/vite", "@inkanjs/query", "@inkanjs/uws"];
+export const PACKAGES = ["@inkanjs/inkan", "@inkanjs/next", "@inkanjs/vite", "@inkanjs/query", "@inkanjs/uws"];
 
 export type Contributor = { login: string; avatar: string; url: string; contributions: number; repos: string[] };
 
