@@ -130,6 +130,8 @@ pre,
 [data-tone="bench"] { --tone: #f5e4d8; }
 [data-tone="integrations"] { --tone: #f2e9da; }
 [data-tone="hanko"] { --tone: #f6e6dc; }
+[data-tone="agents"] { --tone: #f1e3d6; }
+[data-tone="studio"] { --tone: #ece2d3; }
 /* dark: the clips play in the darkest room, the numbers glow a little red */
 .dark[data-tone="contract"] { --tone: #1e1815; }
 .dark[data-tone="playground"] { --tone: #161210; }
@@ -137,6 +139,8 @@ pre,
 .dark[data-tone="bench"] { --tone: #24150f; }
 .dark[data-tone="integrations"] { --tone: #1b1715; }
 .dark[data-tone="hanko"] { --tone: #21130f; }
+.dark[data-tone="agents"] { --tone: #1f1411; }
+.dark[data-tone="studio"] { --tone: #14100e; }
 
 /* Lenis scrolls the page itself; the browser's own smoothing would fight it */
 html.lenis {

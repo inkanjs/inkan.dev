@@ -362,7 +362,9 @@ path, security, meta, spec), frozen, and `sealed()` how the seal went: how many 
 | `title`, `version`, `description`, `servers` | | for OpenAPI and the docs page |
 | `docs` | `"/docs"` | the docs page, or `false` |
 | `openapi` | `"/openapi.json"` | the OpenAPI document, or `false` |
-| `inspector` | `"/_inkan"` in development | the request inspector, loopback only, or `false` |
+| `inspector` | `"/_inkan"` in development | the [studio](/docs/studio), loopback only, or `false` |
+| `protect` | | `{ user, password }` or `(req) => boolean`: guards `/docs`, `/openapi.json` and the studio ([more](/docs/studio#protect)) |
+| `mcp` | off | `true` or `{ path, origins, instructions }`: every route an [MCP](/docs/mcp) tool |
 | `validateResponses` | on in development | checks what handlers return against `response` |
 | `bodyLimit` | 1 MiB | the largest request body in bytes; a route can have its own |
 | `timeout` | none | milliseconds a handler may take before a 504 |
