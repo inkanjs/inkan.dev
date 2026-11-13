@@ -92,7 +92,7 @@ function Session() {
   );
 }
 
-export function Hero() {
+export function Hero({ release }: { release?: { version: string; badge: string; url: string } }) {
   const still = useReducedMotion();
   const [landed, setLanded] = useState(Boolean(still));
 
@@ -123,16 +123,18 @@ export function Hero() {
           </motion.div>
         </div>
 
-        <motion.a
-          href="https://github.com/inkanjs/inkan/releases/tag/v0.9.0"
-          initial={still ? false : { opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.75, duration: 0.5, ease }}
-          className="mb-6 inline-flex max-w-full items-center gap-2 rounded-full border border-line bg-card/60 px-3 py-1 font-mono text-xs text-soft hover:border-hot"
-        >
-          <span className="rounded-full bg-seal px-2 py-0.5 font-bold text-[#fbf1e6]">v0.9.0</span>
-          npm create inkan, WebSockets on any server →
-        </motion.a>
+        {release && (
+          <motion.a
+            href={release.url}
+            initial={still ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.75, duration: 0.5, ease }}
+            className="mb-6 inline-flex max-w-full items-center gap-2 rounded-full border border-line bg-card/60 px-3 py-1 font-mono text-xs text-soft hover:border-hot"
+          >
+            <span className="rounded-full bg-seal px-2 py-0.5 font-bold text-[#fbf1e6]">v{release.version}</span>
+            {release.badge} →
+          </motion.a>
+        )}
 
         <h1 className="font-mono text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-[3.4rem]">
           {["An API framework", "for Node where", "the docs", "can't lie."].map((line, i) => (

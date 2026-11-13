@@ -22,6 +22,12 @@ export const published = (): Post[] => all.filter((post) => !post.draft);
 /** What the blog shows: the published posts, and the drafts too in a preview. */
 export const posts = (): Post[] => (showDrafts ? all : published());
 
+/** The newest published post that announces a release, for the badge on the landing page. */
+export const latestRelease = () => {
+  const post = published().find((p) => p.release);
+  return post?.release && { ...post.release, url: post.url };
+};
+
 export const getPost = (slug: string): Post | undefined => posts().find((post) => post.slug === slug);
 
 /** A post's date as people read it: "3 November 2026". */
