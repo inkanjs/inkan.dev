@@ -120,6 +120,13 @@ inkan mcp src/app.ts -H "authorization: Bearer $TEA_TOKEN"
 `-H` sends a header with every call, such as the token a route asks for. What the app logs
 goes to stderr, so stdout carries only the protocol.
 
+In Claude Code it is one line either way:
+
+```sh
+claude mcp add --transport http tea-shop http://localhost:3000/mcp
+claude mcp add tea-shop -- npx inkan mcp src/app.ts
+```
+
 ## Proven by check
 
 ```sh

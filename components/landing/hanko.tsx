@@ -69,7 +69,7 @@ export function Hanko() {
             })}
           </dl>
           <p className="mt-4 font-mono text-xs text-muted">
-            no official middleware brings a dependency along; otel wants @opentelemetry/api beside it
+            no official middleware brings a dependency along
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-4 font-mono text-sm">
             <Link
