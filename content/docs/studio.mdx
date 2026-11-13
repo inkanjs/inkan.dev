@@ -1,0 +1,65 @@
+---
+title: "Studio"
+description: "/_inkan: the app while it runs. Requests live, every route with its numbers, a map, the MCP tools and the jobs."
+---
+
+<Callout title="New in 0.11.0, experimental">
+What the studio shows, and `protect`, may change in a minor release. The `inspector` option that places it is stable.
+</Callout>
+
+Start the app in development and open `/_inkan`. The studio is a page the app serves itself,
+from what it already knows: every request it answered since the page opened, every route
+with its contract, its tools and its jobs. There is nothing to install and no account.
+
+It answers only this machine (a loopback address) and only in development, unless you put it
+behind [`protect`](#protect). It used to be called the inspector, and the `inspector` option
+still says where it lives: `inspector: "/_inkan"`, another path, or `false`.
+
+## Tabs
+
+| tab | what it shows |
+| --- | --- |
+| **live** | The last 200 requests, newest first, with a filter. A red note means a request or an answer broke the contract. Click a row for its headers (secrets as •••) and bodies, **replay** it and compare the answers, or **copy as example** to paste into the route's `examples`. Above it: requests, broken answers and p95 of the last minute, and the heap, each with a sparkline. |
+| **routes** | Every route with its calls, broken answers, p50, p95 and last status since the studio opened, its MCP tool, whether it asks for credentials, and how many examples it has. Sort by any column: the slowest are a click away. |
+| **map** | The app as a tree of its paths: the methods at each, parameters in colour, tools and auth as badges. |
+| **mcp** | The [MCP](/docs/mcp) tools, made from the contracts. With `mcp` off it shows what it would serve. With it on, every tool has a call form that goes through `/mcp`, like a client would. Below: the routes that are no tools, with the reason, and the latest tool calls. |
+| **jobs** | Every [job](/docs/jobs) kind: its slots, its queue, the next run of its schedule, the jobs running and waiting with a **cancel** button, and the last 20 that ended, with their result or error. |
+
+The numbers are kept only while the studio is on, in this process. In a cluster each worker
+has its own.
+
+## protect
+
+```ts
+const app = inkan({
+  inspector: "/_inkan",                       // on in production too
+  protect: { user: "admin", password: env("STUDIO_PASSWORD") },
+});
+```
+
+`protect` guards the pages inkan serves itself: the docs page, the OpenAPI document and the
+studio. With `{ user, password }` the browser asks for a login (HTTP Basic auth, compared in
+constant time; serve it over HTTPS). A function decides alone:
+
+```ts
+inkan({ protect: (req) => req.headers["x-team-token"] === process.env.TEAM_TOKEN });
+```
+
+It gets the request as an `origins` function does, may return a promise, and a function that
+throws is a no. With `protect`, the studio also answers addresses other than loopback, which
+is what lets it run on a server.
+
+Your routes and the MCP endpoint are not affected: they have `security` and your auth
+hooks. The built-in pages are answered before any hook runs, which is why they have a guard
+of their own.
+
+## JSON
+
+The page reads two documents you can read too:
+
+- `/_inkan/log.json?since=<id>`: the requests after that id
+- `/_inkan/studio.json`: the app, its routes with their numbers, the tools and the jobs
+
+Both are experimental: their fields may change in any release. Cancelling a job is a
+`POST /_inkan/jobs/cancel?kind=<path>&id=<id>` with the header `x-inkan-studio: 1`, which a
+page of another site cannot send without asking first.

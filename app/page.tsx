@@ -10,6 +10,8 @@ import { Playground } from "@/components/landing/playground";
 import { Clips } from "@/components/landing/clips";
 import { Bench, Integrations, Start } from "@/components/landing/sections";
 import { Hanko } from "@/components/landing/hanko";
+import { Agents } from "@/components/landing/agents";
+import { Studio } from "@/components/landing/studio";
 import { pageMeta } from "@/lib/site";
 import { latestRelease } from "@/lib/source";
 import { app } from "@/server/app";
@@ -49,6 +51,8 @@ export default function Home() {
           </p>
         </div>
         <Contract />
+        <Agents />
+        <Studio />
         <Playground />
         <Clips />
         <Bench />

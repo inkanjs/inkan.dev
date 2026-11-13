@@ -97,6 +97,30 @@ line in the logs. A fresh id is a random prefix made when the process starts, th
 in a cluster, and a counter: `0k3f9a2w3-1c8`. Unique per process and per worker, and cheap,
 but not a UUID and not unguessable; nothing should rest on keeping it secret. `ctx.ip` is the client's address, from the socket or the platform.
 
+## What is open in production
+
+inkan serves a few pages of its own. Before you go live, decide for each:
+
+| | in production, by default | to close it | to keep it, but not for everyone |
+| --- | --- | --- | --- |
+| `/docs` | open | `docs: false` | `protect` |
+| `/openapi.json` | open | `openapi: false` | `protect` |
+| `/_inkan`, the [studio](/docs/studio) | off (development only, and loopback only) | — | `inspector: "/_inkan"` with `protect` |
+| `/mcp` | off, unless you set `mcp` | leave `mcp` out | each tool keeps its route's `security` |
+
+```ts
+const app = inkan({
+  docs: false,                     // or keep it, behind protect
+  openapi: false,
+  protect: { user: "team", password: env("DOCS_PASSWORD") }, // for whatever you keep
+});
+```
+
+The docs page and the OpenAPI document say nothing your routes would not tell a client
+anyway, so leaving them open is fine for a public API. For an internal one, close them or
+put them behind [`protect`](/docs/studio#protect). The built-in pages are answered before
+any hook runs, so an auth hook of your own does not reach them: `protect` is the way.
+
 ## The frontend next to it
 
 An app that serves its own built frontend registers two plugins: the files, with the

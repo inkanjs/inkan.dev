@@ -25,6 +25,7 @@
     "runtime",
     "client",
     "mcp",
+    "studio",
     "middleware",
     "hooks",
     "plugins",
