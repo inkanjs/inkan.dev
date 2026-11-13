@@ -22,9 +22,17 @@ export const published = (): Post[] => all.filter((post) => !post.draft);
 /** What the blog shows: the published posts, and the drafts too in a preview. */
 export const posts = (): Post[] => (showDrafts ? all : published());
 
-/** The newest published post that announces a release, for the badge on the landing page. */
+const versionOf = (v: string) => v.split(".").map(Number);
+const newer = (a: string, b: string) => {
+  const [x, y] = [versionOf(a), versionOf(b)];
+  for (let i = 0; i < 3; i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) > (y[i] ?? 0);
+  return false;
+};
+
+/** The published post of the highest release, for the badge on the landing page; two posts on one day stay in order. */
 export const latestRelease = () => {
-  const post = published().find((p) => p.release);
+  let post: Post | undefined;
+  for (const p of published()) if (p.release && (!post || newer(p.release.version, post.release!.version))) post = p;
   return post?.release && { ...post.release, url: post.url };
 };
 

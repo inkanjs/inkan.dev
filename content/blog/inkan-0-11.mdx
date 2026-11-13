@@ -1,0 +1,66 @@
+---
+title: "inkan studio, and a lock for the pages inkan serves"
+description: "inkan 0.11 turns the inspector into a studio: live requests, every route with its numbers, a map, the MCP tools to call by hand and the jobs to cancel. And protect puts a password on /docs, /openapi.json and the studio."
+date: "2026-11-13"
+author: "Vensin"
+release:
+  version: "0.11.0"
+  badge: "inkan studio, and protect for your docs"
+---
+
+An inkan app knows a lot about itself: every route, its contract, its examples, its tool
+name, its jobs. Until now you saw most of that in the docs page, and the requests in the
+inspector at `/_inkan`. In 0.11 the inspector grows into a studio.
+
+## inkan studio
+
+Start the app in development and open `/_inkan`. Five tabs:
+
+- **live**: the requests as they come, with replay and copy as example as before, and above
+  them the last minute at a glance: requests, broken answers, p95 and the heap, each with a
+  sparkline.
+- **routes**: every route with its calls, what broke, p50 and p95 since the studio opened,
+  sortable. The slowest route is one click away.
+- **map**: the app as a tree of its paths, with the methods, the MCP tools and the routes
+  that ask for credentials.
+- **mcp**: the tools from 0.10, each with a form to call it as a client would. With MCP off
+  it shows what it would serve.
+- **jobs**: the queues, the next scheduled run, progress as it happens, a cancel button, and
+  the last jobs that ended with their results.
+
+It is a page the app serves itself. No account, no agent, nothing to install, and nothing
+on the request path in production: the numbers are only kept while the studio is on.
+
+## protect
+
+Someone asked me whether the docs page can be switched off, and whether it can have a
+password. Switching off was always there (`docs: false`, `openapi: false`), but a password
+was not, and could not be added from outside: the pages inkan serves itself are answered
+before any hook runs, so an auth hook never sees them.
+
+```ts
+inkan({ protect: { user: "team", password: env("DOCS_PASSWORD") } });
+```
+
+`protect` puts HTTP Basic auth on `/docs`, `/openapi.json` and the studio, compared in
+constant time, or takes a function that decides alone. With it the studio also answers
+beyond your own machine, so it can run on a server, behind the password. Your routes and the
+MCP endpoint keep their own `security`. The docs now have a page on
+[what is open in production](/docs/deploy#what-is-open-in-production) and how to close it.
+
+## About speed
+
+The studio is off in production, and nothing it needs runs on the path of a request there.
+The first bench said otherwise, by a little: 0.11 was behind 0.10 in all three runs. One
+small thing had moved, a request that is not GET left the built-in pages a few comparisons
+later than before. With that back as it was, on the same GitHub runner as always, inkan
+scores 91.8 (plain `node:http` as 100), 0.10.0 90.9, Fastify 89.6, Hono 85.1 and Express
+50.5, the median of three runs. The runs and every scenario are in
+[the report](https://github.com/inkanjs/inkan/blob/main/bench/reports/0.11.0.md).
+
+## Next
+
+Both the studio and `protect` are experimental in 0.11. Tell me what you miss in the studio:
+it is the part of inkan I most want to hear about from people who use it every day.
+
+See you next time ✨

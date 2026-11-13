@@ -47,7 +47,7 @@ export function Studio() {
   return (
     <section id="studio" data-tone="studio" className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8">
       <div ref={ref}>
-        <p className="font-mono text-sm text-hot">印 coming in 0.11 · inkan studio</p>
+        <p className="font-mono text-sm text-hot">印 new in 0.11 · inkan studio</p>
         <h2 className="mt-3 max-w-3xl font-mono text-3xl font-extrabold leading-tight sm:text-4xl">Watch your app while it runs.</h2>
         <p className="mt-4 max-w-2xl text-soft">
           Open <code className="text-ink">/_inkan</code> while you develop. No account, no agent, nothing to install: the studio is a
