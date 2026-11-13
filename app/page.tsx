@@ -11,6 +11,7 @@ import { Clips } from "@/components/landing/clips";
 import { Bench, Integrations, Start } from "@/components/landing/sections";
 import { Hanko } from "@/components/landing/hanko";
 import { pageMeta } from "@/lib/site";
+import { latestRelease } from "@/lib/source";
 import { app } from "@/server/app";
 
 export const metadata: Metadata = pageMeta({
@@ -37,7 +38,7 @@ export default function Home() {
       <Smooth />
       <Nav />
       <main className="flex-1">
-        <Hero />
+        <Hero release={latestRelease()} />
         <div className="mx-auto w-full max-w-6xl px-5 sm:px-8">
           <p className="flex flex-wrap items-center gap-x-2 border-y border-line py-4 font-mono text-xs text-muted">
             <span className="text-hot">印</span>

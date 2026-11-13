@@ -42,6 +42,8 @@ export const blog = defineCollections({
     date: z.iso.date(),
     author: z.string().default("Vensin"),
     draft: z.boolean().default(false),
+    // the post that announces a release: the newest published one is the badge on the landing page
+    release: z.object({ version: z.string(), badge: z.string() }).optional(),
   }),
 });
 
