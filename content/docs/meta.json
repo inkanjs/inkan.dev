@@ -24,6 +24,7 @@
     "storage",
     "runtime",
     "client",
+    "mcp",
     "middleware",
     "hooks",
     "plugins",

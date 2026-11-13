@@ -1,0 +1,75 @@
+---
+title: "Your API, as tools a model can call"
+description: "inkan 0.10 serves every route as an MCP tool, made from the contract the route already has, and checks that what a model gets is what the docs say."
+date: "2026-11-13"
+author: "Vensin"
+draft: true
+---
+
+Every inkan route carries its contract: what goes in, what comes out, and a few examples of
+a call. Until now three readers used it: the validation, the docs page, and `inkan check`. In
+0.10 there is a fourth. AI clients like Claude, Cursor or VS Code call tools over the
+[Model Context Protocol](https://modelcontextprotocol.io), and a tool is, again, a name, a
+description, an input schema and an output schema. inkan had all of that already.
+
+```ts
+const app = inkan({ title: "Tea Shop", version: "1.0.0", mcp: true });
+```
+
+That is the whole change to an app. Every documented route is a tool on `/mcp`.
+
+## Nothing written twice
+
+The tool's name is the route's `operationId`, the one `openapi.json` already has. Its
+description is the summary, the description, and the examples, written as calls a model can
+copy: `found: {"id":1} → 200`. The input schema is the params, query and body, the output
+schema the 2xx answer. GET says it only reads; DELETE says it destroys. A route can rename or
+reword its tool, or stay out with `mcp: false`, but it does not have to say anything.
+
+Most ways of turning an API into MCP tools generate them from an OpenAPI file and then ask
+you to curate the result. Here there is nothing to generate, so nothing goes stale.
+
+## A tool call is a request
+
+The part I care about most: a tool call does not have a way of its own into the app. A call
+to `getTeasById` with `{ "id": 1 }` becomes `GET /teas/1`, with the caller's Authorization
+header and cookies, and runs through the route's security, the hooks, the input checks,
+middleware, `rateLimit` and the log like any request. Whatever the route would not let that
+caller do, the tool cannot do either.
+
+A problem comes back as a tool error with the problem as its text. When a model sends
+`"id": "abc"`, it reads the same 400 a person would: which field, and what it should be. And
+it can try again.
+
+## Proven, not promised
+
+`inkan check --mcp` runs every example a second time, as a tool call, and holds the answer to
+the same contract. If the tool and the route ever disagree, the check says so before anyone
+asks a model to use it.
+
+I also tested the endpoint with the official MCP SDK and the new 2.x client, both the older
+way (`initialize`) and the new stateless revision from July, 2026-07-28. That paid off right
+away: the new client refused my first tool list because it had no cache hints, which the new
+revision requires. It has them now.
+
+## Locally too
+
+`inkan mcp src/app.ts` serves the same tools on stdin and stdout, for clients that start a
+server as a process. `-H "authorization: Bearer …"` hands it a token. The docs page got an
+**mcp** button that copies the config a client needs.
+
+## About speed
+
+Without `mcp` nothing changes on the request path. While measuring I found that
+`app.inject` had picked up an extra turn per request, and fixed it: the in-process bench is now
+about 4 % faster than 0.9.4, almost all of it in `inject`, which only your tests use. The
+numbers over the network are in the release notes.
+
+## Next
+
+MCP is experimental in 0.10, as WebSockets and jobs were at first. What comes after it is
+still open: llms.txt next to the docs page, Standard Schema so a contract can be written in
+Zod or Valibot, or `inkan mock`, a server made from the examples. Tell me which one you would
+use first.
+
+See you next time ✨
