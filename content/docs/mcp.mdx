@@ -1,0 +1,164 @@
+---
+title: "MCP"
+description: "mcp: true: every route a tool for Claude, Cursor and other AI clients, made from the contract it already has."
+---
+
+<Callout title="New in 0.10.0, experimental">
+The option, the tool shapes and the CLI may change in a minor release, named in the changelog.
+</Callout>
+
+The [Model Context Protocol](https://modelcontextprotocol.io) is how AI clients (Claude, Cursor,
+VS Code and others) call tools. An inkan app already says, for every route, what goes in, what
+comes out and what a call looks like. With `mcp: true` it says the same to those clients:
+
+```ts
+const app = inkan({ title: "Tea Shop", version: "1.0.0", mcp: true });
+```
+
+Every documented route is now a tool on `/mcp`, with nothing written twice. The tool is made
+from the contract, and a tool call is a request to the route, so what a model gets is what the
+docs page shows and `inkan check` tested.
+
+## What a route becomes
+
+```ts
+app.get(
+  "/teas/:id",
+  {
+    summary: "One tea by its id",
+    params: t.object({ id: t.int() }),
+    response: { 200: Tea, 404: t.problem() },
+    examples: [
+      { name: "found", params: { id: 1 } },
+      { name: "missing", params: { id: 99 }, status: 404 },
+    ],
+  },
+  handler,
+);
+```
+
+```json
+{
+  "name": "getTeasById",
+  "title": "One tea by its id",
+  "description": "One tea by its id\n\nExamples:\n- found: {\"id\":1} → 200\n- missing: {\"id\":99} → 404",
+  "inputSchema": { "type": "object", "properties": { "id": { "type": "integer" } }, "required": ["id"], "additionalProperties": false },
+  "outputSchema": { "type": "object", "properties": { "id": { "type": "integer" }, "name": { "type": "string" } }, "required": ["id", "name"] },
+  "annotations": { "title": "One tea by its id", "readOnlyHint": true }
+}
+```
+
+| | comes from |
+| --- | --- |
+| `name` | `mcp.name`, else the `operationId`, the same one `openapi.json` has |
+| `description` | the summary, the description, and up to three examples written as calls |
+| `inputSchema` | params and query side by side, declared `headers`, and `body`. Where a name is in both params and query, they go as `params` and `query` |
+| `outputSchema` | the one 2xx answer, when it is a JSON object |
+| `annotations` | the method: GET is read-only, DELETE destructive, PUT and DELETE idempotent |
+
+`app.mcp()` hands back the tools and the routes that are none, with the reason:
+
+```ts
+const { tools, skipped } = app.mcp();
+// skipped: [{ method: "GET", path: "/feed", reason: "answers with server-sent events" }]
+```
+
+WebSocket routes, event streams, raw, streamed and file bodies are no tools, and neither are
+`hidden` routes. Two routes with the same tool name, or a name MCP cannot carry, throw when the
+tools are made.
+
+## A route's say
+
+```ts
+app.delete("/teas/:id", { /* … */ mcp: { name: "remove_tea", description: "Takes a tea off the shelf for good." } }, handler);
+app.post("/admin/reset", { /* … */ mcp: false }, handler); // never a tool
+```
+
+`mcp: { name, description, annotations }` changes what the client is told; `annotations` is
+merged over what the method says. `mcp: false` keeps a route out.
+
+## A tool call is a request
+
+A call to `getTeasById` with `{ "id": 1 }` is `GET /teas/1`, sent into the app as any other
+request:
+
+- **With the caller's credentials.** The Authorization header, cookies and an API key header the
+  MCP client sends go with it, and an API key a route reads from the query comes from the
+  endpoint's own URL. The route's `security`, your auth hooks and `@inkanjs/auth` decide, as
+  they would over HTTP.
+- **Through everything.** Hooks, input checks, middleware, `bodyLimit`, `rateLimit` (once per
+  call) and the log, where it shows as `via MCP tool getTeasById`. The endpoint itself runs no
+  hooks: only the routes' requests do.
+- **An answer is a result.** A 2xx is the tool's result, as JSON text and, with an
+  `outputSchema`, as `structuredContent` too. A problem is a tool error (`isError`) with the
+  problem as its text, so a model reads that `id` should have been an integer and tries again.
+  The status is in `_meta["dev.inkan/status"]`.
+
+There is no second way into your app, and nothing a tool can do that the route would not let
+the same caller do.
+
+## Connecting a client
+
+Over HTTP, give the client the endpoint. The docs page has an **mcp** button that copies this:
+
+```json
+{ "mcpServers": { "tea-shop": { "type": "http", "url": "http://localhost:3000/mcp" } } }
+```
+
+Or let the client start the app as a process and talk to it on stdin and stdout, with no
+server running:
+
+```sh
+inkan mcp src/app.ts
+inkan mcp src/app.ts -H "authorization: Bearer $TEA_TOKEN"
+```
+
+```json
+{ "mcpServers": { "tea-shop": { "command": "npx", "args": ["inkan", "mcp", "src/app.ts"] } } }
+```
+
+`-H` sends a header with every call, such as the token a route asks for. What the app logs
+goes to stderr, so stdout carries only the protocol.
+
+## Proven by check
+
+```sh
+inkan check src/app.ts --mcp
+```
+
+Every example of a route that is a tool runs twice, once as a request and once as a
+`tools/call`, and both answers are held to the same contract. `app.check({ mcp: true })` does
+the same in a test.
+
+```text
+  GET    /teas/:id
+    ✓ found                              200  1.3ms
+    ✓ missing                            404  0.4ms
+    ✓ found via MCP                      200  0.3ms
+    ✓ missing via MCP                    404  0.2ms
+```
+
+## The endpoint
+
+```ts
+inkan({ mcp: { path: "/mcp", origins: ["https://claude.ai"], instructions: "Teas, their kinds and stock." } });
+```
+
+| option | |
+| --- | --- |
+| `path` | where it lives. Default `/mcp` |
+| `origins` | the pages that may call it from a browser: by default the app's own origin, and clients without an Origin header, which are not browsers. Another origin is a 403. Same shape as `cors` and `ws.origins` |
+| `instructions` | what a model is told about the server as a whole. Default: the app's `description` |
+
+It speaks MCP **2026-07-28**, stateless, with every request's `MCP-Protocol-Version`,
+`Mcp-Method` and `Mcp-Name` headers checked against its body, `server/discover`, and cache hints
+on the tool list (`cacheScope: "public"`, `ttlMs` 0 in development, five minutes otherwise).
+For older clients it answers `initialize` for 2025-11-25 back to 2025-03-26, without a session
+either way. It takes POST only and one message per request. It is tested against the official
+SDK 1.32 and `@modelcontextprotocol/client` 2.4, both the legacy way and pinned to 2026-07-28.
+
+Without `mcp` there is no endpoint, and the request path does no more work than before.
+
+Not there yet: resources and prompts, OAuth protected resource metadata (RFC 9728) for
+clients that sign in by themselves, and `ctx.mcp`, for a handler to know it was called as a
+tool. That name is reserved and arrives in a later release.

@@ -1,10 +1,11 @@
 ---
 title: "CLI"
-description: "inkan check, diff, openapi, create, examples, hanko and seal."
+description: "inkan check, diff, openapi, mcp, create, examples, hanko and seal."
 ---
 
 ```sh
-npx inkan check   src/app.ts [--only <text>] [--strict] [--format terminal|json|markdown]
+npx inkan check   src/app.ts [--only <text>] [--strict] [--mcp] [--format terminal|json|markdown]
+npx inkan mcp     src/app.ts [-H "name: value"]...
 npx inkan openapi src/app.ts [-o openapi.json]
 npx inkan routes  src/app.ts
 npx inkan diff    openapi.json src/app.ts [--format terminal|json|markdown]
@@ -24,6 +25,10 @@ what would break a client written against the old one: a route or status that is
 field that is required now, a value a request may no longer send, a value an answer may
 send now. Requests may only get looser and answers only stricter; it exits with `1` when
 something breaks, so CI can ask for a major version.
+
+`inkan mcp` serves the app as an [MCP](/docs/mcp) server on stdin and stdout, for clients
+that start it as a process; `-H` sends a header with every tool call. `inkan check --mcp` runs
+every example of a tool a second time, as a tool call.
 
 `inkan create app` is what `npm create inkan` runs; its options are on
 [Installation](/docs/installation#start-a-project). `inkan create plugin` writes a package for
