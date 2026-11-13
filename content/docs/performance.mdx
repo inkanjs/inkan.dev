@@ -15,23 +15,24 @@ after a warm-up, 3 rounds each; the median of three such runs:
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | **inkan on uWebSockets.js** ¹ | **134.4** | 147 % | 148 % | 104 % | 99 % | 149 % | 154 % | 115 % |
 | node:http, by hand | 100 | 100 % | 100 % | 100 % | 100 % | 100 % | 100 % | 100 % |
-| **inkan** | **89.4** | **94 %** | 89 % | 86 % | 90 % | 89 % | **93 %** | 74 % |
-| **inkan, sealed** | 88.3 | 85 % | **92 %** | **98 %** | 88 % | 89 % | 88 % | 76 % |
-| Fastify | 87.2 | 88 % | 91 % | 91 % | 76 % | **90 %** | 87 % | 59 % |
-| Hono | 82.5 | 84 % | 71 % | 94 % | **99 %** | 71 % | 74 % | **84 %** |
-| Express | 46.1 | 44 % | 46 % | 71 % | 72 % | 23 % | 22 % | 50 % |
+| **inkan** | **89.8** | 90 % | **93 %** | 87 % | 88 % | 91 % | **95 %** | 81 % |
+| **inkan, sealed** ² | 88.3 | 85 % | 92 % | **98 %** | 88 % | 89 % | 88 % | 76 % |
+| Fastify | 88.6 | 92 % | 90 % | 93 % | 80 % | **94 %** | 92 % | 76 % |
+| Hono | 85.6 | **94 %** | 77 % | 93 % | **98 %** | 77 % | 85 % | **87 %** |
+| Express | 48.9 | 53 % | 52 % | 69 % | 73 % | 23 % | 23 % | 53 % |
 
 ¹ With [`@inkanjs/uws`](/docs/integrations/uws), measured with 0.6.0 in a run of its own, against `node:http` in that run.
+² Measured with 0.9.0, in the runs of that release.
 
 The score is the geometric mean over all twelve scenarios against bare `node:http`,
 so no single one can carry or sink a server. inkan does a little more per request
 than the others: it gives every request an id and keeps back every key an answer's
 contract does not list. Read the numbers as a range, not a rank: a run on another
 day moves each server by a few points. inkan is a little ahead of Fastify: in front in all
-three runs, by about two points, but not in every scenario (Fastify leads the body of 50, the
-async handler and 3 middlewares). As fast as 0.8. With `inkan seal`, a body of 50 objects is
-checked faster than by any of them. The runs of 0.9.0 are in
-[`bench/reports/0.9.0.md`](https://github.com/inkanjs/inkan/blob/main/bench/reports/0.9.0.md).
+three runs, by one to two points, but not in every scenario (Fastify leads the body of 50, the
+400 routes and 3 middlewares). As fast as 0.9. With `inkan seal`, a body of 50 objects is
+checked faster than by any of them. The runs of 0.10.0 are in
+[`bench/reports/0.10.0.md`](https://github.com/inkanjs/inkan/blob/main/bench/reports/0.10.0.md).
 
 Run it yourself: `cd bench && npm install && node run.mjs`, or the `bench` workflow
 on GitHub, which also measures what one request costs the server in CPU time.

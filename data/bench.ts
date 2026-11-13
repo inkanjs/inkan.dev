@@ -4,7 +4,7 @@
 // A new run: change `run` and the values, nothing else on the page needs to move.
 
 export const run = {
-  date: "2026-11-03",
+  date: "2026-11-13",
   machine: "GitHub Actions runner, 4 cores",
   tool: "autocannon",
   seconds: 15,
@@ -35,14 +35,15 @@ export type Server = {
   values: Record<ScenarioKey, number>;
 };
 
-// inkan 0.9.0: the median of three runs of the release bench, every server in each run;
-// inkan on uWebSockets.js still from its own run with 0.6.0, against node:http in that run.
+// inkan 0.10.0: the median of three runs of the release bench, every server in each run;
+// inkan sealed from the runs of 0.9.0, and inkan on uWebSockets.js from its own run with
+// 0.6.0, each against node:http in its run.
 export const servers: Server[] = [
   { name: "inkan on uWebSockets.js", what: "@inkanjs/uws, measured with 0.6.0", ours: true, score: 134.4, values: { hello: 147, params: 148, body: 104, answer: 99, router: 149, notFound: 154, invalid: 115 } },
   { name: "node:http, by hand", what: "the baseline", base: true, score: 100, values: { hello: 100, params: 100, body: 100, answer: 100, router: 100, notFound: 100, invalid: 100 } },
-  { name: "inkan", what: "on node:http", ours: true, score: 89.4, values: { hello: 94, params: 89, body: 86, answer: 90, router: 89, notFound: 93, invalid: 74 } },
-  { name: "inkan, sealed", what: "inkan seal", ours: true, score: 88.3, values: { hello: 85, params: 92, body: 98, answer: 88, router: 89, notFound: 88, invalid: 76 } },
-  { name: "Fastify", what: "schemas, like inkan", score: 87.2, values: { hello: 88, params: 91, body: 91, answer: 76, router: 90, notFound: 87, invalid: 59 } },
-  { name: "Hono", what: "checks by hand", score: 82.5, values: { hello: 84, params: 71, body: 94, answer: 99, router: 71, notFound: 74, invalid: 84 } },
-  { name: "Express", what: "checks by hand", score: 46.1, values: { hello: 44, params: 46, body: 71, answer: 72, router: 23, notFound: 22, invalid: 50 } },
+  { name: "inkan", what: "on node:http", ours: true, score: 89.8, values: { hello: 90, params: 93, body: 87, answer: 88, router: 91, notFound: 95, invalid: 81 } },
+  { name: "inkan, sealed", what: "inkan seal, measured with 0.9.0", ours: true, score: 88.3, values: { hello: 85, params: 92, body: 98, answer: 88, router: 89, notFound: 88, invalid: 76 } },
+  { name: "Fastify", what: "schemas, like inkan", score: 88.6, values: { hello: 92, params: 90, body: 93, answer: 80, router: 94, notFound: 92, invalid: 76 } },
+  { name: "Hono", what: "checks by hand", score: 85.6, values: { hello: 94, params: 77, body: 93, answer: 98, router: 77, notFound: 85, invalid: 87 } },
+  { name: "Express", what: "checks by hand", score: 48.9, values: { hello: 53, params: 52, body: 69, answer: 73, router: 23, notFound: 23, invalid: 53 } },
 ];

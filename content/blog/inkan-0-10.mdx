@@ -3,7 +3,6 @@ title: "Your API, as tools a model can call"
 description: "inkan 0.10 serves every route as an MCP tool, made from the contract the route already has, and checks that what a model gets is what the docs say."
 date: "2026-11-13"
 author: "Vensin"
-draft: true
 ---
 
 Every inkan route carries its contract: what goes in, what comes out, and a few examples of
@@ -62,8 +61,10 @@ server as a process. `-H "authorization: Bearer …"` hands it a token. The docs
 
 Without `mcp` nothing changes on the request path. While measuring I found that
 `app.inject` had picked up an extra turn per request, and fixed it: the in-process bench is now
-about 4 % faster than 0.9.4, almost all of it in `inject`, which only your tests use. The
-numbers over the network are in the release notes.
+about 4 % faster than 0.9.4, almost all of it in `inject`, which only your tests use. Over
+the network, on the GitHub runner, inkan scores 89.8 against 0.9.4's 89.7 and Fastify's
+88.6 (median of three runs), ahead of Fastify in all three but not in every scenario. The
+[benchmarks page](/benchmarks) has the table.
 
 ## Next
 
