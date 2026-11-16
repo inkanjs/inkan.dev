@@ -1,6 +1,6 @@
 // Components the MDX pages may use besides the Fumadocs ones.
 import type { ReactNode } from "react";
-import { run, scenarios, servers } from "@/data/bench";
+import { run, scenarios, servers, widerRun } from "@/data/bench";
 
 /**
  * Two code blocks next to each other on a wide screen, one under the other on a narrow one:
@@ -12,9 +12,14 @@ export function Side({ children }: { children: ReactNode }) {
 
 const REPORTS = "https://github.com/inkanjs/inkan/tree/main/bench/reports";
 
-/** The numbers of data/bench.ts for the servers named, so the page never drifts from /benchmarks. */
-export function BenchTable({ names }: { names: string[] }) {
-  const rows = names.map((name) => servers.find((s) => s.name === name)).filter((s) => s !== undefined);
+/**
+ * The numbers of data/bench.ts for the servers named, so the page never drifts from /benchmarks.
+ * `wide` takes them from the run with every framework instead of the release bench.
+ */
+export function BenchTable({ names, wide = false }: { names: string[]; wide?: boolean }) {
+  const from = wide ? widerRun.servers : servers;
+  const meta = wide ? widerRun.run : run;
+  const rows = names.map((name) => from.find((s) => s.name === name)).filter((s) => s !== undefined);
   return (
     <>
       <div className="not-prose my-6 overflow-x-auto rounded-xl border border-fd-border">
@@ -46,9 +51,19 @@ export function BenchTable({ names }: { names: string[] }) {
         </table>
       </div>
       <p className="text-sm text-fd-muted-foreground">
-        Requests per second next to bare <code>node:http</code> as 100, on Node {run.node}, a {run.machine}, {run.tool},{" "}
-        {run.rounds} rounds of {run.seconds} seconds, measured {run.date}. The full runs, with the method and the raw numbers, are
-        in <a href={REPORTS}>bench/reports</a>; every scenario is on <a href="/benchmarks">/benchmarks</a>.
+        Requests per second next to bare <code>node:http</code> as 100, on Node {meta.node}, a {meta.machine}, {meta.tool},{" "}
+        {meta.rounds} rounds of {meta.seconds} seconds, measured {meta.date}
+        {wide ? ", all ten in one run" : ""}. The full runs, with the method and the raw numbers, are in{" "}
+        <a href={REPORTS}>bench/reports</a>
+        {wide ? (
+          <>
+            ; this one is <a href={`${REPORTS}/frameworks-2026-11.md`}>frameworks-2026-11.md</a>.
+          </>
+        ) : (
+          <>
+            ; every scenario is on <a href="/benchmarks">/benchmarks</a>.
+          </>
+        )}
       </p>
     </>
   );

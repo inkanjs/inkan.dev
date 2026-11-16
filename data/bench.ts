@@ -47,3 +47,21 @@ export const servers: Server[] = [
   { name: "Hono", what: "checks by hand", score: 85.6, values: { hello: 94, params: 77, body: 93, answer: 98, router: 77, notFound: 85, invalid: 87 } },
   { name: "Express", what: "checks by hand", score: 48.9, values: { hello: 53, params: 52, body: 69, answer: 73, router: 23, notFound: 23, invalid: 53 } },
 ];
+
+// One run with ten frameworks at once (bench/reports/frameworks-2026-11.md). Only the compare
+// page shows it, next to the release numbers above, never mixed into them.
+export const widerRun: { run: typeof run; servers: Server[] } = {
+  run: { ...run, date: "2026-11-13" },
+  servers: [
+    { name: "node:http, by hand", what: "the baseline", base: true, score: 100, values: { hello: 100, params: 100, body: 100, answer: 100, router: 100, notFound: 100, invalid: 100 } },
+    { name: "Fastify", what: "schemas, like inkan", score: 88.8, values: { hello: 88, params: 96, body: 95, answer: 80, router: 91, notFound: 83, invalid: 73 } },
+    { name: "inkan", what: "on node:http", ours: true, score: 88.5, values: { hello: 89, params: 90, body: 89, answer: 88, router: 93, notFound: 88, invalid: 78 } },
+    { name: "Hono", what: "checks by hand", score: 81.0, values: { hello: 85, params: 71, body: 88, answer: 97, router: 72, notFound: 71, invalid: 84 } },
+    { name: "h3", what: "checks by hand", score: 75.8, values: { hello: 75, params: 72, body: 88, answer: 95, router: 72, notFound: 60, invalid: 80 } },
+    { name: "Elysia", what: "on Node, its own schemas", score: 54.7, values: { hello: 76, params: 39, body: 41, answer: 93, router: 43, notFound: 59, invalid: 22 } },
+    { name: "hapi", what: "checks by hand", score: 46.5, values: { hello: 45, params: 40, body: 52, answer: 76, router: 44, notFound: 45, invalid: 38 } },
+    { name: "Express", what: "checks by hand", score: 40.1, values: { hello: 43, params: 39, body: 59, answer: 68, router: 18, notFound: 16, invalid: 43 } },
+    { name: "NestJS", what: "on Express", score: 34.4, values: { hello: 36, params: 34, body: 54, answer: 63, router: 17, notFound: 14, invalid: 30 } },
+    { name: "Koa", what: "with @koa/router", score: 25.2, values: { hello: 20, params: 20, body: 38, answer: 51, router: 22, notFound: 20, invalid: 24 } },
+  ],
+};

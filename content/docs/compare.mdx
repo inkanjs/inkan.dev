@@ -1,10 +1,10 @@
 ---
-title: "inkan, Express, Fastify, Hono"
-description: "What each of the four is best at, when I would pick which, and how fast they are on the same bench."
+title: "inkan next to the other Node frameworks"
+description: "Express, Fastify, Hono, Koa, hapi, h3, Elysia and NestJS: what each is best at, when I would pick which, and how fast they are on the same bench."
 ---
 
 I write inkan, so take this page with that in mind. I have tried to put down where each of
-the other three is the better choice, because for a lot of projects one of them is. If
+the others is the better choice, because for a lot of projects one of them is. If
 something here is wrong or out of date, [open an issue](https://github.com/inkanjs/inkan/issues)
 and I will fix the page.
 
@@ -18,7 +18,7 @@ a rejected promise from an async handler to the error middleware, so the oldest 
 What it leaves to you is everything about the shape of the data. Validation, the types of
 `req.body`, an OpenAPI document and the docs are separate tools (zod or express-validator,
 swagger-jsdoc or a hand-written spec), and nothing makes them agree with the handler. It is
-also the slowest of the four by a wide margin on the bench below, mostly in routing: with 400
+also the slowest of Express, Fastify, Hono and inkan by a wide margin on the bench below, mostly in routing: with 400
 routes or a 404 it does about a fifth of what bare `node:http` does.
 
 **Pick Express when** the team knows it well, you depend on middleware that only exists for
@@ -58,6 +58,72 @@ is at home, and these numbers say nothing about that.
 **Pick Hono when** your API runs at the edge or on Workers, or cold start and bundle size
 matter more to you than anything on this page.
 
+## Koa
+
+Koa is Express done again by the same people, around `async`/`await`: one context object
+instead of a request and a response, and middleware that wraps the rest of the chain, so it
+can act both before and after the handler. The core is tiny and leaves almost everything to
+packages: routing (`@koa/router`), body parsing, validation. Code written for it tends to be
+clean and easy to follow.
+
+On the bench below it comes last, and that needs a word. `@koa/router` tests each request
+against every route, and the bench app has 800 of them. With two routes Koa is level with
+Express. So the number is fair for a big Koa app on the standard router, not for Koa itself.
+
+**Pick Koa when** you like the onion model of middleware, your app has tens of routes rather
+than hundreds, and you want to choose every piece yourself.
+
+## hapi
+
+hapi is built for large teams and long-lived services. Routes are configuration objects
+with validation (Joi), auth strategies, caching and lifecycle extensions next to the handler,
+and plugins have explicit dependencies and their own config. It came out of Walmart, where it
+carried Black Friday traffic, and it puts a lot of care into security defaults.
+
+It is more ceremony than the others for a small API, and its ecosystem is mostly its own
+(`@hapi/*`) rather than the wider middleware world. On the bench it is a little ahead of
+Express overall, and clearly ahead on routing.
+
+**Pick hapi when** a large team needs strong conventions, auth and validation configured per
+route, and you value stable, careful releases over speed.
+
+## h3
+
+h3 is the server under Nitro and Nuxt. Like Hono it is built on web-standard requests and
+responses and runs on Node, Bun, Deno, Workers and more, with small composable helpers
+(`readBody`, `getQuery`) instead of a big framework object. On the bench it is the fastest of
+the newcomers and not far behind Hono, strong on large bodies and answers.
+
+**Pick h3 when** you are in the Nuxt or Nitro world, or want a small, standards-based server
+that runs on several runtimes, and you bring your own validation and docs.
+
+## Elysia
+
+Elysia is made for Bun, and its idea is close to inkan's: a schema per route (TypeBox) gives
+validation, the handler's types, an OpenAPI document and an end-to-end typed client (Eden).
+It is fast and pleasant to write, and on Bun it is among the fastest servers in JavaScript.
+
+On Node it runs through `@elysiajs/node`, and the bench only measures that. It does well on
+answers without input, and loses about half wherever its schemas read params or a body,
+because each request first goes through the adapter. Measure it on Bun before you judge it.
+
+**Pick Elysia when** you run on Bun and want contracts, types and a typed client from one
+place. On Node, inkan or Fastify give you the same idea for less.
+
+## NestJS
+
+NestJS is a full application framework: modules, dependency injection, decorators,
+guards, pipes and interceptors, in the style of Angular or Spring. It brings an answer for
+almost everything (OpenAPI, GraphQL, queues, microservices, testing) and a structure that
+many developers already know, which is a lot when a big team builds a big app.
+
+It sits on Express or Fastify and adds its own layer, so it is never faster than the one
+beneath it. On its default Express platform it lands a little below Express on the bench.
+Validation is usually `class-validator`, which the bench does not use; there it checks by hand.
+
+**Pick NestJS when** the app is large, the team wants one structure and DI everywhere, and
+the speed of a single request matters less than how the codebase holds together.
+
 ## inkan
 
 inkan starts from one contract per route: params, query, headers, body, the answers per
@@ -89,6 +155,14 @@ swap places in single scenarios from run to run. What the bench does show reliab
 schema check does not have to cost much: the two frameworks that validate everything are the
 two fastest. It measures one small route at a time on one machine; your database will
 usually matter more than any of these differences.
+
+All ten in one run, Koa, hapi, h3, Elysia and NestJS next to the ones above (Elysia checks
+with its own schemas, the other four by hand):
+
+<BenchTable wide names={["node:http, by hand", "Fastify", "inkan", "Hono", "h3", "Elysia", "hapi", "Express", "NestJS", "Koa"]} />
+
+This is one run, not the median of three, so inkan and Fastify only differ by noise here;
+the table above is the steadier one for them. Elysia is measured on Node, not on Bun.
 
 ## Moving over
 
